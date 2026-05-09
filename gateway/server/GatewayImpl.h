@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file           : GatewayImpl.h
   * @author         : vivi wu
-  * @brief          : Gateway 服务端实现（TCP server / 消息收发 / protobuf 解析归档）
-  * @version        : 0.1.0
+  * @brief          : Gateway 服务端实现（ZMQ_ROUTER / 消息收发 / protobuf 解析归档）
+  * @version        : 0.2.0
   * @date           : 09/05/26
   ******************************************************************************
   */
@@ -34,22 +34,18 @@ public:
     void Stop() override;
 
 private:
-    void AcceptThreadFunc();
-    void ClientThreadFunc(int clientSock);
-    void CloseAllClientSockets();
+    void DispatchThreadFunc();
+    void ProcessMessage(const std::vector<uint8_t>& identity,
+                        uint16_t rawType, const std::vector<uint8_t>& body);
 
     IGatewayHandler* handler_ = nullptr;
     ThreadPool* threadPool_ = nullptr;
-    int serverSock_ = -1;
+    void* routerSock_ = nullptr;
     int maxConnections_ = 0;
     int idleTimeoutSec_ = 0;
     std::atomic<int> activeConnections_{0};
     std::atomic<bool> running_{false};
-    std::thread acceptThread_;
-
-    std::mutex clientsMutex_;
-    std::vector<std::thread> clientThreads_;
-    std::vector<int> clientSockets_;
+    std::thread dispatchThread_;
 };
 
 } // namespace gateway

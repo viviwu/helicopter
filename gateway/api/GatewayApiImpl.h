@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file           : GatewayApiImpl.h
   * @author         : vivi wu
-  * @brief          : GatewayApi实现（隐藏所有网络、线程、protobuf细节）
-  * @version        : 0.1.0
+  * @brief          : GatewayApi 实现（ZMQ_DEALER，隐藏网络/线程/protobuf 细节）
+  * @version        : 0.2.0
   * @date           : 09/05/26
   ******************************************************************************
   */
@@ -36,7 +36,7 @@ private:
     int port_ = 12345;
     int heartbeatIntervalSec_ = 5;
     GatewaySpi* spi_ = nullptr;
-    int sockfd_ = -1;
+    void* dealerSock_ = nullptr;
     std::atomic<bool> running_{false};
     std::thread recvThread_;
 };

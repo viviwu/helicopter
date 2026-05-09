@@ -99,5 +99,6 @@ cmake-build-*/
 **/local/
 **/bin/
 **/build/
+**/output/
 *.zip
 *.bak

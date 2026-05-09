@@ -20,14 +20,12 @@ using namespace gateway;
 namespace {
     Gateway*    g_gateway = nullptr;
     ThreadPool* g_pool    = nullptr;
+    volatile std::sig_atomic_t g_shutdownRequested = 0;
 }
 
 static void signalHandler(int /*sig*/) {
-    std::cout << "\nReceived signal, shutting down...\n";
-    if (g_gateway) {
-        g_gateway->Stop();
-    }
-    // pool shutdown 交由 main() 处理，避免信号处理函数中阻塞过久
+    // 信号处理函数中仅设置标志位，实际关闭由 main 线程执行
+    g_shutdownRequested = 1;
 }
 
 int main() {
@@ -52,9 +50,13 @@ int main() {
     std::cout << "Gateway server running with thread pool (" << pool.WorkerCount()
               << " workers). Press Ctrl+C to stop.\n";
 
-    pause();  // 等待信号
+    // 等待信号
+    while (!g_shutdownRequested) {
+        pause();
+    }
+    std::cout << "\nReceived signal, shutting down...\n";
 
-    g_gateway->Stop();     // 幂等（信号处理函数可能已调用）
+    g_gateway->Stop();     // 停止接受连接，通知 dispatch 线程退出
     pool.Shutdown();       // 等待所有 client 任务完成，安全释放 handler
     g_gateway->Release();
 

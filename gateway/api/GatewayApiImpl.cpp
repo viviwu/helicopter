@@ -2,8 +2,8 @@
   ******************************************************************************
   * @file           : GatewayApiImpl.cpp
   * @author         : vivi wu
-  * @brief          : GatewayApi实现
-  * @version        : 0.1.0
+  * @brief          : GatewayApi实现（ZMQ_DEALER）
+  * @version        : 0.2.0
   * @date           : 09/05/26
   ******************************************************************************
   */
@@ -15,13 +15,9 @@
 #include "gateway.pb.h"
 
 #include <iostream>
-#include <cstring>
-#include <algorithm>
-#include <sys/socket.h>
-#include <netinet/tcp.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
+#include <string>
+
+#include <zmq.h>
 
 namespace gateway {
 
@@ -30,38 +26,6 @@ namespace gateway {
 // ============================================================================
 GatewayApi* GatewayApi::CreateGatewayApi() {
     return new GatewayApiImpl();
-}
-
-// ============================================================================
-// 辅助：TCP KeepAlive（跨平台）
-// ============================================================================
-static void SetTcpKeepAlive(int sockfd, int heartbeatIntervalSec) {
-    int enable = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &enable, sizeof(enable)) < 0) {
-        perror("setsockopt SO_KEEPALIVE");
-        return;
-    }
-
-    // 连接空闲 heartbeatIntervalSec 秒后开始发送探测包
-#if defined(TCP_KEEPIDLE)
-    int idle = heartbeatIntervalSec;
-    setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle));
-#elif defined(TCP_KEEPALIVE)
-    int idle = heartbeatIntervalSec;
-    setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPALIVE, &idle, sizeof(idle));
-#endif
-
-    // 探测间隔使用用户传入的心跳间隔
-#if defined(TCP_KEEPINTVL)
-    int interval = heartbeatIntervalSec;
-    setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &interval, sizeof(interval));
-#endif
-
-    // 连续 3 次探测无响应则断开
-#if defined(TCP_KEEPCNT)
-    int count = 3;
-    setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &count, sizeof(count));
-#endif
 }
 
 // ============================================================================
@@ -94,12 +58,12 @@ static gateway::LoginResponse FromProtoResponse(const gateway_proto::LoginRespon
 // 构造/析构
 // ============================================================================
 GatewayApiImpl::GatewayApiImpl()
-    : spi_(nullptr), sockfd_(-1) {}
+    : spi_(nullptr), dealerSock_(nullptr) {}
 
 GatewayApiImpl::~GatewayApiImpl() {
     running_ = false;
-    Disconnect();
-    JoinThread();
+    JoinThread();   // 先等待接收线程退出
+    Disconnect();   // 再关闭 socket
 }
 
 // ============================================================================
@@ -114,45 +78,33 @@ void GatewayApiImpl::RegisterSpi(GatewaySpi* pSpi) {
 }
 
 int GatewayApiImpl::Init(const char* frontAddress, int port, int heartbeatIntervalSec) {
-    if (sockfd_ >= 0) {
+    if (dealerSock_) {
         return ERR_OK;
     }
 
     // 如果之前有旧线程（如断线后未清理），先安全回收
-    if (recvThread_.joinable()) {
-        recvThread_.join();
-    }
+    JoinThread();
 
     frontAddress_ = frontAddress ? frontAddress : "";
     port_ = port;
     heartbeatIntervalSec_ = heartbeatIntervalSec;
 
-    sockfd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd_ < 0) {
-        perror("socket");
+    void* sock = CreateDealerSocket();
+    if (!sock) {
+        std::cerr << "Failed to create ZMQ_DEALER socket\n";
         return ERR_NETWORK;
     }
 
-    sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port   = htons(static_cast<uint16_t>(port_));
-    if (inet_pton(AF_INET, frontAddress_.c_str(), &serverAddr.sin_addr) <= 0) {
-        std::cerr << "Invalid frontAddress: " << frontAddress_ << "\n";
-        close(sockfd_);
-        sockfd_ = -1;
+    // 启用 TCP KeepAlive
+    SetTcpKeepalive(sock, 1, heartbeatIntervalSec_, heartbeatIntervalSec_, 3);
+
+    std::string address = "tcp://" + frontAddress_ + ":" + std::to_string(port_);
+    if (!ConnectSocket(sock, address.c_str())) {
+        CloseSocket(sock);
         return ERR_NETWORK;
     }
 
-    if (connect(sockfd_, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) < 0) {
-        perror("connect");
-        close(sockfd_);
-        sockfd_ = -1;
-        return ERR_NETWORK;
-    }
-
-    // 启用 TCP keepalive，确保服务端异常/网络断开时能及时感知
-    SetTcpKeepAlive(sockfd_, heartbeatIntervalSec_);
-
+    dealerSock_ = sock;
     running_ = true;
     recvThread_ = std::thread(&GatewayApiImpl::RecvThreadFunc, this);
 
@@ -163,7 +115,7 @@ int GatewayApiImpl::Init(const char* frontAddress, int port, int heartbeatInterv
 }
 
 int GatewayApiImpl::Login(const LoginRequest& req) {
-    if (sockfd_ < 0) {
+    if (!dealerSock_) {
         std::cerr << "Not connected, call Init() first\n";
         return ERR_NETWORK;
     }
@@ -173,7 +125,7 @@ int GatewayApiImpl::Login(const LoginRequest& req) {
     std::string reqData = protoReq.SerializeAsString();
     std::vector<uint8_t> body(reqData.begin(), reqData.end());
 
-    if (!sendMessage(sockfd_, static_cast<uint16_t>(GatewayMsgType::kLoginRequest), body)) {
+    if (!SendMessage(dealerSock_, static_cast<uint16_t>(GatewayMsgType::kLoginRequest), body)) {
         std::cerr << "Failed to send LoginRequest\n";
         return ERR_SEND_FAILED;
     }
@@ -181,18 +133,28 @@ int GatewayApiImpl::Login(const LoginRequest& req) {
 }
 
 // ============================================================================
-// 后台线程
+// 后台接收线程
 // ============================================================================
 void GatewayApiImpl::RecvThreadFunc() {
+    zmq_pollitem_t items[] = { { dealerSock_, 0, ZMQ_POLLIN, 0 } };
+
     while (running_.load()) {
+        int rc = zmq_poll(items, 1, 100);  // 100ms 超时，确保能及时响应 running_ 变化
+        if (rc < 0) {
+            if (running_.load()) std::cerr << "zmq_poll error: " << zmq_strerror(zmq_errno()) << "\n";
+            break;
+        }
+        if (rc == 0) continue;  // 超时，重新检查 running_
+
+        if (!(items[0].revents & ZMQ_POLLIN)) continue;
+
         uint16_t rawType = 0;
         std::vector<uint8_t> body;
-        if (!recvMessage(sockfd_, rawType, body)) {
-            // 先打印日志，再清理，再回调，避免回调里重入 Init 时看到旧 sockfd_
+        if (!RecvMessage(dealerSock_, rawType, body)) {
             if (running_.load()) {
                 std::cerr << "Recv error or server disconnected\n";
             }
-            Disconnect();  // 关闭 socket，置 sockfd_ = -1，支持下次重连
+            Disconnect();
             if (running_.load() && spi_) {
                 spi_->OnFrontDisconnected(0);
             }
@@ -221,10 +183,9 @@ void GatewayApiImpl::RecvThreadFunc() {
 }
 
 void GatewayApiImpl::Disconnect() {
-    if (sockfd_ >= 0) {
-        shutdown(sockfd_, SHUT_RDWR);
-        close(sockfd_);
-        sockfd_ = -1;
+    if (dealerSock_) {
+        CloseSocket(dealerSock_);
+        dealerSock_ = nullptr;
     }
 }
 

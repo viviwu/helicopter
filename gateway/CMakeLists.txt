@@ -12,6 +12,10 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/output")
 set(Protobuf_DIR "/usr/local/Cellar/protobuf/34.1/lib/cmake/protobuf")
 find_package(Protobuf CONFIG REQUIRED)
 
+# ---- 1.5 找到 ZeroMQ 库 ----
+set(ZeroMQ_DIR "/usr/local/Cellar/zeromq/4.3.5_2/lib/cmake")
+find_package(ZeroMQ CONFIG REQUIRED)
+
 # ---- 2. 找到 protoc 编译器（用于生成 .pb.cc/.h） ----
 # protoc 一般已通过 Homebrew link 到 /usr/local/bin，直接查找即可
 find_program(PROTOC_EXE protoc
@@ -42,9 +46,10 @@ add_library(proto_gen STATIC ${PROTO_GEN_DIR}/gateway.pb.cc)
 target_include_directories(proto_gen PUBLIC ${PROTO_GEN_DIR})
 target_link_libraries(proto_gen PUBLIC protobuf::libprotobuf)
 
-# ---- 6. 消息工具库（纯粹的 socket 收发包，不依赖 protobuf） ----
+# ---- 6. 消息工具库（ZeroMQ 收发包，不依赖 protobuf） ----
 add_library(message_utils STATIC common/message_utils.cpp)
 target_include_directories(message_utils PUBLIC ${CMAKE_SOURCE_DIR}/common)
+target_link_libraries(message_utils PUBLIC libzmq)
 
 # ---- 6.5 线程池（通用任务调度） ----
 add_library(thread_pool STATIC common/ThreadPool.cpp)
