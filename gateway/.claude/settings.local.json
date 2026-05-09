@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake *)",
+      "Bash(./output/server)",
+      "Bash(timeout 3 ./output/client)"
+    ]
+  }
+}

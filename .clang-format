@@ -1,0 +1,19 @@
+---
+Language:        Cpp
+BasedOnStyle:  Google
+Standard:        c++17
+UseTab:          Never
+ColumnLimit:     200
+AlignAfterOpenBracket: Align
+BinPackParameters: false
+AlignEscapedNewlines: Left
+AlwaysBreakTemplateDeclarations: Yes
+PackConstructorInitializers: Never
+BreakConstructorInitializersBeforeComma: false
+IndentPPDirectives: BeforeHash
+IndentCaseLabels: true
+IndentWidth: 2
+MaxEmptyLinesToKeep: 2
+TabWidth: 2
+...
+
