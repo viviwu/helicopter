@@ -14,6 +14,8 @@
 #include "common/ThreadPool.h"
 
 #include <atomic>
+#include <chrono>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -37,6 +39,10 @@ private:
     void DispatchThreadFunc();
     void ProcessMessage(const std::vector<uint8_t>& identity,
                         uint16_t rawType, const std::vector<uint8_t>& body);
+    void SendPong(const std::vector<uint8_t>& identity);
+    void CleanupIdleConnections();
+
+    using TimePoint = std::chrono::steady_clock::time_point;
 
     IGatewayHandler* handler_ = nullptr;
     ThreadPool* threadPool_ = nullptr;
@@ -46,6 +52,10 @@ private:
     std::atomic<int> activeConnections_{0};
     std::atomic<bool> running_{false};
     std::thread dispatchThread_;
+
+    // 连接活跃时间管理（identity -> 最后活跃时间）
+    std::mutex connMutex_;
+    std::map<std::vector<uint8_t>, TimePoint> lastActive_;
 };
 
 } // namespace gateway

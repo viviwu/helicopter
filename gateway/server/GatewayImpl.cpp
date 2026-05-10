@@ -70,6 +70,9 @@ bool GatewayImpl::Start(const char* bindAddr, int port) {
         return false;
     }
 
+    // 启用 ZMQ 内置心跳：每隔 3s 发送一次，9s 未收到则判定断开
+    SetZmqHeartbeat(sock, 3000, 9000, 20000);
+
     std::string address = "tcp://" + std::string(bindAddr) + ":" + std::to_string(port);
     if (!BindSocket(sock, address.c_str())) {
         CloseSocket(sock);
@@ -115,7 +118,13 @@ void GatewayImpl::DispatchThreadFunc() {
             if (running_) std::cerr << "zmq_poll error: " << zmq_strerror(zmq_errno()) << "\n";
             break;
         }
-        if (rc == 0) continue;  // 超时，重新检查 running_
+        if (rc == 0) {
+            // 超时：检查空闲连接
+            if (idleTimeoutSec_ > 0) {
+                CleanupIdleConnections();
+            }
+            continue;
+        }
 
         if (!(items[0].revents & ZMQ_POLLIN)) continue;
 
@@ -126,6 +135,20 @@ void GatewayImpl::DispatchThreadFunc() {
         if (!RecvRouterMessage(routerSock_, identity, rawType, body)) {
             if (running_) continue;
             break;
+        }
+
+        // 更新活跃时间
+        {
+            std::lock_guard<std::mutex> lock(connMutex_);
+            lastActive_[identity] = std::chrono::steady_clock::now();
+        }
+
+        auto msgType = static_cast<GatewayMsgType>(rawType);
+
+        // 心跳消息直接在 dispatch 线程处理，避免线程池延迟
+        if (msgType == GatewayMsgType::kPing) {
+            SendPong(identity);
+            continue;
         }
 
         // 连接数控制：新 identity 时检查
@@ -195,6 +218,31 @@ void GatewayImpl::ProcessMessage(const std::vector<uint8_t>& identity,
     default:
         std::cerr << "Unknown message type: " << rawType << "\n";
         break;
+    }
+}
+
+void GatewayImpl::SendPong(const std::vector<uint8_t>& identity) {
+    std::vector<uint8_t> emptyBody;
+    if (!SendRouterMessage(routerSock_, identity,
+                           static_cast<uint16_t>(GatewayMsgType::kPong), emptyBody)) {
+        std::cerr << "Failed to send Pong to client\n";
+    }
+}
+
+void GatewayImpl::CleanupIdleConnections() {
+    std::lock_guard<std::mutex> lock(connMutex_);
+    auto now = std::chrono::steady_clock::now();
+    for (auto it = lastActive_.begin(); it != lastActive_.end(); ) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - it->second).count();
+        if (elapsed >= idleTimeoutSec_) {
+            std::cout << "Client idle timeout, removing identity ("
+                      << elapsed << "s >= " << idleTimeoutSec_ << "s)\n";
+            it = lastActive_.erase(it);
+            int remaining = activeConnections_.fetch_sub(1) - 1;
+            if (remaining < 0) activeConnections_.store(0);
+        } else {
+            ++it;
+        }
     }
 }
 

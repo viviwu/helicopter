@@ -49,6 +49,12 @@ void SetRecvTimeout(void* sock, int ms);
 /// 启用 TCP KeepAlive 并设置参数
 void SetTcpKeepalive(void* sock, int keepalive, int idle, int interval, int count);
 
+/// 启用 ZMQ 内置心跳（ZMQ_HEARTBEAT_IVL / ZMQ_HEARTBEAT_TIMEOUT / ZMQ_HEARTBEAT_TTL）
+/// @param ivlMs      心跳发送间隔（毫秒），0 表示禁用
+/// @param timeoutMs  心跳超时（毫秒），超过此时间未收到对端心跳则视为断开
+/// @param ttlMs      心跳消息 TTL（毫秒），一般设为 timeoutMs 的 2~3 倍
+void SetZmqHeartbeat(void* sock, int ivlMs, int timeoutMs, int ttlMs);
+
 // ============================================================================
 // 绑定 / 连接
 // ============================================================================

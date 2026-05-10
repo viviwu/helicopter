@@ -62,8 +62,9 @@ GatewayApiImpl::GatewayApiImpl()
 
 GatewayApiImpl::~GatewayApiImpl() {
     running_ = false;
-    JoinThread();   // 先等待接收线程退出
-    Disconnect();   // 再关闭 socket
+    JoinHeartbeatThread();  // 先停止心跳线程
+    JoinThread();           // 再等待接收线程退出
+    Disconnect();           // 最后关闭 socket
 }
 
 // ============================================================================
@@ -95,7 +96,11 @@ int GatewayApiImpl::Init(const char* frontAddress, int port, int heartbeatInterv
         return ERR_NETWORK;
     }
 
-    // 启用 TCP KeepAlive
+    // 启用 ZMQ 内置心跳（替代 TCP keepalive，跨 NAT/代理更可靠）
+    // ivl=3s, timeout=9s, ttl=20s
+    SetZmqHeartbeat(sock, 3000, 9000, 20000);
+
+    // 保留 TCP keepalive 作为底层兜底（部分旧版 ZMQ 可能不支持 ZMQ_HEARTBEAT）
     SetTcpKeepalive(sock, 1, heartbeatIntervalSec_, heartbeatIntervalSec_, 3);
 
     std::string address = "tcp://" + frontAddress_ + ":" + std::to_string(port_);
@@ -106,7 +111,10 @@ int GatewayApiImpl::Init(const char* frontAddress, int port, int heartbeatInterv
 
     dealerSock_ = sock;
     running_ = true;
+    lastPongTime_ = std::chrono::steady_clock::now();
+    missedPongs_ = 0;
     recvThread_ = std::thread(&GatewayApiImpl::RecvThreadFunc, this);
+    heartbeatThread_ = std::thread(&GatewayApiImpl::HeartbeatThreadFunc, this);
 
     if (spi_) {
         spi_->OnFrontConnected();
@@ -161,8 +169,17 @@ void GatewayApiImpl::RecvThreadFunc() {
             break;
         }
 
+        auto msgType = static_cast<GatewayMsgType>(rawType);
+
+        // 处理应用层心跳 Pong
+        if (msgType == GatewayMsgType::kPong) {
+            lastPongTime_ = std::chrono::steady_clock::now();
+            missedPongs_ = 0;
+            continue;
+        }
+
         // 仅处理登录响应
-        if (static_cast<GatewayMsgType>(rawType) != GatewayMsgType::kLoginResponse) {
+        if (msgType != GatewayMsgType::kLoginResponse) {
             std::cerr << "Unexpected message type: " << rawType << "\n";
             continue;
         }
@@ -182,6 +199,48 @@ void GatewayApiImpl::RecvThreadFunc() {
     }
 }
 
+void GatewayApiImpl::HeartbeatThreadFunc() {
+    while (running_.load()) {
+        // 按心跳间隔休眠（分 100ms 片段检查 running_）
+        int slept = 0;
+        int targetMs = heartbeatIntervalSec_ * 1000;
+        while (slept < targetMs && running_.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            slept += 100;
+        }
+        if (!running_.load()) break;
+
+        // 发送应用层 Ping
+        std::vector<uint8_t> emptyBody;
+        if (!SendMessage(dealerSock_, static_cast<uint16_t>(GatewayMsgType::kPing), emptyBody)) {
+            std::cerr << "Failed to send Ping, connection may be dead\n";
+            int missed = missedPongs_.fetch_add(1) + 1;
+            if (missed >= kMaxMissedPongs) {
+                running_ = false;
+                if (spi_) {
+                    spi_->OnFrontDisconnected(1);  // 1=心跳超时
+                }
+                break;
+            }
+            continue;
+        }
+
+        // 检查上次收到 Pong 的时间
+        auto now = std::chrono::steady_clock::now();
+        auto lastPong = lastPongTime_.load();
+        auto elapsedSec = std::chrono::duration_cast<std::chrono::seconds>(now - lastPong).count();
+        int threshold = heartbeatIntervalSec_ * kMaxMissedPongs;
+        if (elapsedSec >= threshold) {
+            std::cerr << "Heartbeat timeout (no Pong for " << elapsedSec << "s)\n";
+            running_ = false;
+            if (spi_) {
+                spi_->OnFrontDisconnected(1);  // 1=心跳超时
+            }
+            break;
+        }
+    }
+}
+
 void GatewayApiImpl::Disconnect() {
     if (dealerSock_) {
         CloseSocket(dealerSock_);
@@ -192,6 +251,12 @@ void GatewayApiImpl::Disconnect() {
 void GatewayApiImpl::JoinThread() {
     if (recvThread_.joinable()) {
         recvThread_.join();
+    }
+}
+
+void GatewayApiImpl::JoinHeartbeatThread() {
+    if (heartbeatThread_.joinable()) {
+        heartbeatThread_.join();
     }
 }
 

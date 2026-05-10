@@ -80,6 +80,12 @@ void SetTcpKeepalive(void* sock, int keepalive, int idle, int interval, int coun
     zmq_setsockopt(sock, ZMQ_TCP_KEEPALIVE_CNT, &count, sizeof(count));
 }
 
+void SetZmqHeartbeat(void* sock, int ivlMs, int timeoutMs, int ttlMs) {
+    zmq_setsockopt(sock, ZMQ_HEARTBEAT_IVL, &ivlMs, sizeof(ivlMs));
+    zmq_setsockopt(sock, ZMQ_HEARTBEAT_TIMEOUT, &timeoutMs, sizeof(timeoutMs));
+    zmq_setsockopt(sock, ZMQ_HEARTBEAT_TTL, &ttlMs, sizeof(ttlMs));
+}
+
 // ============================================================================
 // 绑定 / 连接
 // ============================================================================

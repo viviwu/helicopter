@@ -17,10 +17,12 @@ namespace gateway {
 enum class GatewayMsgType : uint16_t {
     kLoginRequest  = 1,
     kLoginResponse = 2,
+    kPing          = 3,  // 客户端 → 服务端：应用层心跳请求
+    kPong          = 4,  // 服务端 → 客户端：应用层心跳响应
     // 后续拓展:
-    // kQueryOrderRequest  = 3,
-    // kQueryOrderResponse = 4,
-    // kSendOrderRequest   = 5,
+    // kQueryOrderRequest  = 5,
+    // kQueryOrderResponse = 6,
+    // kSendOrderRequest   = 7,
 };
 
 } // namespace gateway

@@ -56,7 +56,7 @@ public:
     /// 初始化并建立到前置机的网络连接
     /// @param frontAddress 前置机地址，如 "127.0.0.1"
     /// @param port 前置机端口
-    /// @param heartbeatIntervalSec TCP keepalive 空闲探测间隔（秒），同时也作为探测间隔
+    /// @param heartbeatIntervalSec 应用层心跳间隔（秒），同时作为 ZMQ 心跳与 TCP keepalive 参数
     /// @return 0-成功，ERR_NETWORK-连接失败
     virtual int Init(const char* frontAddress, int port, int heartbeatIntervalSec) = 0;
 

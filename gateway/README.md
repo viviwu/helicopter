@@ -8,7 +8,9 @@
 - **业务注入**：提供 `IGatewayHandler` 接口，业务模块只需实现接口方法即可接入，无需关注网络细节
 - **独立可拓展**：Gateway 与业务 handler 各自独立，新增消息类型/业务只需在接口中增加虚函数，并在分派分支中增加 case
 - **并发能力**：内建 `ThreadPool` 通用任务调度，可配置最大连接数
-- **SDK 配套**：提供 `GatewayApi` 客户端 SDK，封装 ZMQ DEALER 连接、消息收发、protobuf 转换，对业务层暴露纯 C++ 结构体回调
+- **连接管理**：支持最大连接数限制、空闲连接超时清理
+- **双层心跳**：ZMQ 内置 `HEARTBEAT` + 应用层 `Ping/Pong`，跨 NAT/代理比纯 TCP keepalive 更可靠
+- **SDK 配套**：提供 `GatewayApi` 客户端 SDK，封装 ZMQ DEALER 连接、消息收发、protobuf 转换、自动心跳与断线检测，对业务层暴露纯 C++ 结构体回调
 
 ## 设计宗旨
 
@@ -99,7 +101,9 @@ gateway/
 |----|------|------|------|
 | `1` | `kLoginRequest` | Client → Server | 登录请求 |
 | `2` | `kLoginResponse` | Server → Client | 登录响应 |
-| _3-5_ | _预留_ | — | _后续拓展_ |
+| `3` | `kPing` | Client → Server | 应用层心跳请求 |
+| `4` | `kPong` | Server → Client | 应用层心跳响应 |
+| _5-7_ | _预留_ | — | _后续拓展_ |
 
 ### 与旧版 TCP 协议的关键区别
 
@@ -110,6 +114,7 @@ gateway/
 | 连接管理 | 手工管理 clientSockets_ 列表 | ZeroMQ 自动管理 identity 路由 |
 | 重连 | 不支持 | DEALER 自动重连 |
 | 优雅关闭 | SO_RCVTIMEO + close 所有 fd | zmq_poll 超时 + running_ 标志 |
+| 心跳机制 | TCP keepalive（NAT 穿透差） | ZMQ_HEARTBEAT + 应用层 Ping/Pong |
 
 ## 实现要点
 
@@ -125,6 +130,8 @@ gateway/
 - **单 dispatch 线程模型**：`DispatchThreadFunc` 使用 `zmq_poll` (100ms 超时) 轮询 ROUTER socket，收到消息后提交到 ThreadPool 处理
 - **消息分派**：`ProcessMessage` 按 `switch (msgType)` 路由到不同 handler 方法
 - **连接数控制**：通过跟踪 client identity 集合限制最大连接数，超限时返回错误响应
+- **空闲连接清理**：`idleTimeoutSec_` 超时未活跃的 identity 自动清理，释放连接计数
+- **心跳响应**：dispatch 线程直接处理 `kPing` 并回复 `kPong`，不经过线程池，降低延迟
 - **优雅退出**：`Stop()` 设置 `running_=false` → join dispatch 线程（最多 100ms）→ 关闭 socket → 调用者 `pool.Shutdown()` → `Release()`
 
 ### 3. 线程池（`ThreadPool`）
@@ -166,7 +173,10 @@ public:
 - **接口分离**：`GatewayApi` 提供主动调用的 API（`Init`/`Login`/`Release`），`GatewaySpi` 提供异步回调
 - **protobuf 透明**：业务层仅使用纯 C++ 结构体，protobuf 完全隐藏在 `GatewayApiImpl.cpp` 内部
 - **ZMQ_DEALER**：客户端使用 DEALER socket，自动处理重连；接收线程使用 `zmq_poll` (100ms) 支持优雅退出
-- **TCP KeepAlive**：通过 `ZMQ_TCP_KEEPALIVE` 选项启用
+- **双层心跳**：
+  - **ZMQ 层**：socket 启用 `ZMQ_HEARTBEAT_IVL` / `ZMQ_HEARTBEAT_TIMEOUT`，在 ZMTP 协议层维持连接，穿越 NAT/代理能力优于 TCP keepalive
+  - **应用层**：独立心跳线程按 `heartbeatIntervalSec` 周期性发送 `kPing`；接收线程收到 `kPong` 后重置计时器；连续 3 个周期未收到 `kPong` 触发 `OnFrontDisconnected(1)`（心跳超时）
+- **TCP KeepAlive**：保留作为旧版 ZMQ 兜底方案
 
 ## 构建 & 运行
 
@@ -249,6 +259,7 @@ int main() {
     gw->RegisterHandler(&authHandler);
     gw->SetThreadPool(&pool);
     gw->SetMaxConnections(10000);
+    gw->SetIdleTimeout(60);   // 60 秒无消息则清理连接
 
     // 3. 启动
     gw->Start("0.0.0.0", 12345);
@@ -284,6 +295,15 @@ gw->Release();
 #include "api/GatewayApi.h"
 
 class MySpi : public gateway::GatewaySpi {
+    void OnFrontConnected() override {
+        // 连接建立（Init 成功后同步回调）
+    }
+
+    void OnFrontDisconnected(int nReason) override {
+        // nReason: 0=正常断开/网络错误, 1=应用层心跳超时
+        // 可在此触发重连逻辑
+    }
+
     void OnLogin(const gateway::LoginResponse& rsp) override {
         if (rsp.error_code == gateway::ERR_OK) {
             // 登录成功，执行业务逻辑
@@ -320,10 +340,10 @@ int main() {
 
 | 方向 | 说明 |
 |------|------|
-| **应用层心跳** | 使用 ZMQ_HEARTBEAT 或自定义 Ping/Pong 消息替代 TCP keepalive，跨 NAT/代理更可靠 |
+| ~~应用层心跳~~ | ✅ 已完成：ZMQ_HEARTBEAT + 自定义 Ping/Pong 双层心跳，跨 NAT/代理更可靠 |
 | **消息队列** | 在 handler 与外部系统间引入消息队列，解耦同步处理 |
 | **日志系统** | 将 `std::cerr`/`std::cout` 替换为结构化日志（如 spdlog） |
-| **配置化** | 端口、地址、线程数等硬编码参数迁移至配置文件（JSON/YAML） |
+| **配置化** | 端口、地址、线程数、心跳间隔（ZMQ_HEARTBEAT_IVL / 应用层 Ping 周期）等硬编码参数迁移至配置文件（JSON/YAML） |
 | **单元测试** | 对 `message_utils`、`ThreadPool`、消息分派逻辑增加 gtest 覆盖 |
 | **安全** | 登录密码 hash（bcrypt/argon2）、ZMQ Curve 加密传输 |
 | **Pub-Sub 广播** | 利用 ZeroMQ PUB/SUB 模式实现服务端消息广播 |

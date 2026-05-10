@@ -12,6 +12,7 @@
 
 #include "api/GatewayApi.h"
 #include <atomic>
+#include <chrono>
 #include <string>
 #include <thread>
 
@@ -29,8 +30,10 @@ public:
 
 private:
     void RecvThreadFunc();
+    void HeartbeatThreadFunc();
     void Disconnect();
     void JoinThread();
+    void JoinHeartbeatThread();
 
     std::string frontAddress_;
     int port_ = 12345;
@@ -39,6 +42,13 @@ private:
     void* dealerSock_ = nullptr;
     std::atomic<bool> running_{false};
     std::thread recvThread_;
+    std::thread heartbeatThread_;
+
+    // 应用层心跳超时检测（与 ZMQ 内置心跳互补）
+    using TimePoint = std::chrono::steady_clock::time_point;
+    std::atomic<TimePoint> lastPongTime_{TimePoint{}};
+    std::atomic<int> missedPongs_{0};
+    static constexpr int kMaxMissedPongs = 3;   // 连续丢失 3 个 Pong 视为断开
 };
 
 } // namespace gateway
