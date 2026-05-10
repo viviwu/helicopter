@@ -15,14 +15,15 @@
 namespace gateway {
 
 enum class GatewayMsgType : uint16_t {
-    kLoginRequest  = 1,
-    kLoginResponse = 2,
-    kPing          = 3,  // 客户端 → 服务端：应用层心跳请求
-    kPong          = 4,  // 服务端 → 客户端：应用层心跳响应
+    kLoginRequest           = 1,
+    kLoginResponse          = 2,
+    kPing                   = 3,  // 客户端 → 服务端：应用层心跳请求
+    kPong                   = 4,  // 服务端 → 客户端：应用层心跳响应
+    kBroadcastNotification  = 5,  // 服务端 → 客户端（PUB）：广播通知
     // 后续拓展:
-    // kQueryOrderRequest  = 5,
-    // kQueryOrderResponse = 6,
-    // kSendOrderRequest   = 7,
+    // kQueryOrderRequest  = 6,
+    // kQueryOrderResponse = 7,
+    // kSendOrderRequest   = 8,
 };
 
 } // namespace gateway

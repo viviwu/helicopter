@@ -64,23 +64,44 @@ bool GatewayImpl::Start(const char* bindAddr, int port) {
         return false;
     }
 
-    void* sock = CreateRouterSocket();
-    if (!sock) {
+    // 1. 创建 ROUTER socket
+    void* router = CreateRouterSocket();
+    if (!router) {
         std::cerr << "Failed to create ZMQ_ROUTER socket\n";
         return false;
     }
 
     // 启用 ZMQ 内置心跳：每隔 3s 发送一次，9s 未收到则判定断开
-    SetZmqHeartbeat(sock, 3000, 9000, 20000);
+    SetZmqHeartbeat(router, 3000, 9000, 20000);
 
-    std::string address = "tcp://" + std::string(bindAddr) + ":" + std::to_string(port);
-    if (!BindSocket(sock, address.c_str())) {
-        CloseSocket(sock);
+    std::string routerAddr = "tcp://" + std::string(bindAddr) + ":" + std::to_string(port);
+    if (!BindSocket(router, routerAddr.c_str())) {
+        CloseSocket(router);
         return false;
     }
 
-    routerSock_ = sock;
-    std::cout << "Gateway (ZMQ_ROUTER) listening on " << address << "\n";
+    // 2. 创建 PUB socket（广播端口 = router 端口 + 1）
+    void* pub = CreatePubSocket();
+    if (!pub) {
+        std::cerr << "Failed to create ZMQ_PUB socket\n";
+        CloseSocket(router);
+        return false;
+    }
+
+    std::string pubAddr = "tcp://" + std::string(bindAddr) + ":" + std::to_string(port + 1);
+    if (!BindSocket(pub, pubAddr.c_str())) {
+        CloseSocket(pub);
+        CloseSocket(router);
+        return false;
+    }
+
+    routerSock_ = router;
+    pubSock_ = pub;
+    bindAddr_ = bindAddr;
+    routerPort_ = port;
+
+    std::cout << "Gateway (ZMQ_ROUTER) listening on " << routerAddr << "\n";
+    std::cout << "Gateway (ZMQ_PUB)    listening on " << pubAddr << "\n";
 
     running_ = true;
     dispatchThread_ = std::thread(&GatewayImpl::DispatchThreadFunc, this);
@@ -99,6 +120,10 @@ void GatewayImpl::Stop() {
     if (routerSock_) {
         CloseSocket(routerSock_);
         routerSock_ = nullptr;
+    }
+    if (pubSock_) {
+        CloseSocket(pubSock_);
+        pubSock_ = nullptr;
     }
 }
 
@@ -243,6 +268,51 @@ void GatewayImpl::CleanupIdleConnections() {
         } else {
             ++it;
         }
+    }
+}
+
+void GatewayImpl::BroadcastNotification(const std::string& content) {
+    if (!pubSock_) {
+        std::cerr << "PUB socket not ready, broadcast skipped\n";
+        return;
+    }
+
+    // ZMQ PUB/SUB slow-joiner 缓解策略：
+    // SUB socket 从 connect → subscribe 到过滤器同步至 PUB 需要短暂时间（~100ms），
+    // 期间发送的消息会被丢弃。通过重复发送 + 间隔等待确保新客户端能收到广播。
+    // 所有重发使用相同的 message_id，客户端根据 message_id 去重，不会重复回调。
+    static constexpr int kBroadcastRetryCount = 3;
+    static constexpr int kBroadcastRetryIntervalMs = 100;
+    static std::atomic<uint64_t> sBroadcastSeq{0};
+
+    uint64_t msgId = sBroadcastSeq.fetch_add(1) + 1;
+
+    gateway_proto::BroadcastNotification notif;
+    notif.set_content(content);
+    notif.set_message_id(msgId);
+    notif.set_timestamp(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count()
+    );
+
+    std::string data = notif.SerializeAsString();
+    std::vector<uint8_t> body(data.begin(), data.end());
+
+    bool ok = false;
+    for (int i = 0; i < kBroadcastRetryCount; ++i) {
+        if (SendMessage(pubSock_, static_cast<uint16_t>(GatewayMsgType::kBroadcastNotification), body)) {
+            ok = true;
+        }
+        if (i < kBroadcastRetryCount - 1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kBroadcastRetryIntervalMs));
+        }
+    }
+
+    if (ok) {
+        std::cout << "Broadcast sent to all clients (msg_id=" << msgId
+                  << "): " << content << "\n";
+    } else {
+        std::cerr << "Failed to broadcast notification\n";
     }
 }
 

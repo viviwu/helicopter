@@ -9,7 +9,7 @@
   */
 #include <iostream>
 #include <csignal>
-#include <unistd.h>
+#include <string>
 
 #include "server/Gateway.h"
 #include "server/AuthHandler.h"
@@ -26,6 +26,14 @@ namespace {
 static void signalHandler(int /*sig*/) {
     // 信号处理函数中仅设置标志位，实际关闭由 main 线程执行
     g_shutdownRequested = 1;
+}
+
+static void printMenu() {
+    std::cout << "\n========== Gateway Server Menu ==========\n"
+              << "1. Broadcast notification to all clients\n"
+              << "2. Shutdown server\n"
+              << "=========================================\n"
+              << "Please select: ";
 }
 
 int main() {
@@ -48,12 +56,32 @@ int main() {
     }
 
     std::cout << "Gateway server running with thread pool (" << pool.WorkerCount()
-              << " workers). Press Ctrl+C to stop.\n";
+              << " workers).\n";
 
-    // 等待信号
+    // 交互式菜单主循环
     while (!g_shutdownRequested) {
-        pause();
+        printMenu();
+        std::string choice;
+        if (!std::getline(std::cin, choice)) {
+            // EOF 或信号中断输入
+            break;
+        }
+
+        if (choice == "1") {
+            std::cout << "Enter broadcast message: ";
+            std::string msg;
+            if (!std::getline(std::cin, msg)) break;
+            g_gateway->BroadcastNotification(msg);
+        }
+        else if (choice == "2") {
+            std::cout << "Shutting down...\n";
+            g_shutdownRequested = 1;
+        }
+        else {
+            std::cout << "Invalid choice, please try again.\n";
+        }
     }
+
     std::cout << "\nReceived signal, shutting down...\n";
 
     g_gateway->Stop();     // 停止接受连接，通知 dispatch 线程退出

@@ -40,6 +40,7 @@ private:
     int heartbeatIntervalSec_ = 5;
     GatewaySpi* spi_ = nullptr;
     void* dealerSock_ = nullptr;
+    void* subSock_ = nullptr;
     std::atomic<bool> running_{false};
     std::thread recvThread_;
     std::thread heartbeatThread_;
@@ -49,6 +50,9 @@ private:
     std::atomic<TimePoint> lastPongTime_{TimePoint{}};
     std::atomic<int> missedPongs_{0};
     static constexpr int kMaxMissedPongs = 3;   // 连续丢失 3 个 Pong 视为断开
+
+    // 广播去重：记录最近一条已处理的 message_id
+    uint64_t lastBroadcastId_ = 0;
 };
 
 } // namespace gateway

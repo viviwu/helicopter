@@ -32,6 +32,10 @@ public:
     /// 登录请求响应（异步回调）
     /// @param rsp 登录响应结构
     virtual void OnLogin(const LoginResponse& rsp) = 0;
+
+    /// 服务端广播通知（异步回调）
+    /// @param notif 广播通知内容
+    virtual void OnBroadcast(const BroadcastNotification& notif) {}
 };
 
 // ============================================================================

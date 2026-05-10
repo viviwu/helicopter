@@ -48,6 +48,12 @@ struct LoginResponse {
     AccountInfo account;
 };
 
+struct BroadcastNotification {
+    std::string content;
+    int64_t timestamp = 0;
+    uint64_t message_id = 0;
+};
+
 } // namespace gateway
 
 #endif // GATEWAY_API_DEF_H

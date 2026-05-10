@@ -33,6 +33,12 @@ void* CreateRouterSocket();
 /// 创建 ZMQ_DEALER socket（客户端），失败返回 nullptr
 void* CreateDealerSocket();
 
+/// 创建 ZMQ_PUB socket（服务端广播），失败返回 nullptr
+void* CreatePubSocket();
+
+/// 创建 ZMQ_SUB socket（客户端订阅），失败返回 nullptr
+void* CreateSubSocket();
+
 /// 关闭 socket（自动设置 linger=0 确保快速关闭）
 void CloseSocket(void* sock);
 
@@ -54,6 +60,9 @@ void SetTcpKeepalive(void* sock, int keepalive, int idle, int interval, int coun
 /// @param timeoutMs  心跳超时（毫秒），超过此时间未收到对端心跳则视为断开
 /// @param ttlMs      心跳消息 TTL（毫秒），一般设为 timeoutMs 的 2~3 倍
 void SetZmqHeartbeat(void* sock, int ivlMs, int timeoutMs, int ttlMs);
+
+/// 设置 SUB socket 订阅过滤器（空字符串 "" 表示接收所有消息）
+void SetSubSubscribe(void* sock, const char* filter);
 
 // ============================================================================
 // 绑定 / 连接

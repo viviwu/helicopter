@@ -12,6 +12,8 @@
 
 #include "common/gateway_msg_types.h"
 
+#include <string>
+
 class ThreadPool;  // forward declare
 
 namespace gateway_proto {
@@ -67,14 +69,18 @@ public:
     /// @param seconds 空闲超时秒数
     virtual void SetIdleTimeout(int seconds) = 0;
 
-    /// 启动 TCP 服务
+    /// 启动 TCP 服务（同时启动 ROUTER 和 PUB socket）
     /// @param bindAddr 绑定地址，如 "0.0.0.0"
-    /// @param port 监听端口
+    /// @param port 监听端口（PUB 端口固定为 port + 1）
     /// @return true-启动成功, false-失败
     virtual bool Start(const char* bindAddr, int port) = 0;
 
     /// 停止服务
     virtual void Stop() = 0;
+
+    /// 向所有已连接的客户端广播通知（通过 PUB socket）
+    /// @param content 通知内容
+    virtual void BroadcastNotification(const std::string& content) = 0;
 };
 
 } // namespace gateway

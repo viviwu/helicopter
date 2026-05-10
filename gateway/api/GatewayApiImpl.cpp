@@ -58,7 +58,7 @@ static gateway::LoginResponse FromProtoResponse(const gateway_proto::LoginRespon
 // 构造/析构
 // ============================================================================
 GatewayApiImpl::GatewayApiImpl()
-    : spi_(nullptr), dealerSock_(nullptr) {}
+    : spi_(nullptr), dealerSock_(nullptr), subSock_(nullptr) {}
 
 GatewayApiImpl::~GatewayApiImpl() {
     running_ = false;
@@ -90,26 +90,45 @@ int GatewayApiImpl::Init(const char* frontAddress, int port, int heartbeatInterv
     port_ = port;
     heartbeatIntervalSec_ = heartbeatIntervalSec;
 
-    void* sock = CreateDealerSocket();
-    if (!sock) {
+    // 1. 创建 DEALER socket（请求-应答通道）
+    void* dealer = CreateDealerSocket();
+    if (!dealer) {
         std::cerr << "Failed to create ZMQ_DEALER socket\n";
         return ERR_NETWORK;
     }
 
     // 启用 ZMQ 内置心跳（替代 TCP keepalive，跨 NAT/代理更可靠）
     // ivl=3s, timeout=9s, ttl=20s
-    SetZmqHeartbeat(sock, 3000, 9000, 20000);
+    SetZmqHeartbeat(dealer, 3000, 9000, 20000);
 
     // 保留 TCP keepalive 作为底层兜底（部分旧版 ZMQ 可能不支持 ZMQ_HEARTBEAT）
-    SetTcpKeepalive(sock, 1, heartbeatIntervalSec_, heartbeatIntervalSec_, 3);
+    SetTcpKeepalive(dealer, 1, heartbeatIntervalSec_, heartbeatIntervalSec_, 3);
 
-    std::string address = "tcp://" + frontAddress_ + ":" + std::to_string(port_);
-    if (!ConnectSocket(sock, address.c_str())) {
-        CloseSocket(sock);
+    std::string dealerAddr = "tcp://" + frontAddress_ + ":" + std::to_string(port_);
+    if (!ConnectSocket(dealer, dealerAddr.c_str())) {
+        CloseSocket(dealer);
         return ERR_NETWORK;
     }
 
-    dealerSock_ = sock;
+    // 2. 创建 SUB socket（广播订阅通道，PUB 端口固定为 router 端口 + 1）
+    void* sub = CreateSubSocket();
+    if (!sub) {
+        std::cerr << "Failed to create ZMQ_SUB socket\n";
+        CloseSocket(dealer);
+        return ERR_NETWORK;
+    }
+    SetSubSubscribe(sub, "");  // 空过滤器：接收所有广播消息
+
+    std::string subAddr = "tcp://" + frontAddress_ + ":" + std::to_string(port_ + 1);
+    if (!ConnectSocket(sub, subAddr.c_str())) {
+        std::cerr << "Failed to connect SUB socket to " << subAddr << "\n";
+        CloseSocket(sub);
+        CloseSocket(dealer);
+        return ERR_NETWORK;
+    }
+
+    dealerSock_ = dealer;
+    subSock_ = sub;
     running_ = true;
     lastPongTime_ = std::chrono::steady_clock::now();
     missedPongs_ = 0;
@@ -144,57 +163,103 @@ int GatewayApiImpl::Login(const LoginRequest& req) {
 // 后台接收线程
 // ============================================================================
 void GatewayApiImpl::RecvThreadFunc() {
-    zmq_pollitem_t items[] = { { dealerSock_, 0, ZMQ_POLLIN, 0 } };
+    zmq_pollitem_t items[] = {
+        { dealerSock_, 0, ZMQ_POLLIN, 0 },
+        { subSock_,    0, ZMQ_POLLIN, 0 }
+    };
 
     while (running_.load()) {
-        int rc = zmq_poll(items, 1, 100);  // 100ms 超时，确保能及时响应 running_ 变化
+        int rc = zmq_poll(items, 2, 100);  // 100ms 超时，确保能及时响应 running_ 变化
         if (rc < 0) {
             if (running_.load()) std::cerr << "zmq_poll error: " << zmq_strerror(zmq_errno()) << "\n";
             break;
         }
         if (rc == 0) continue;  // 超时，重新检查 running_
 
-        if (!(items[0].revents & ZMQ_POLLIN)) continue;
-
-        uint16_t rawType = 0;
-        std::vector<uint8_t> body;
-        if (!RecvMessage(dealerSock_, rawType, body)) {
-            if (running_.load()) {
-                std::cerr << "Recv error or server disconnected\n";
+        // ---- DEALER socket（请求-应答通道）----
+        if (items[0].revents & ZMQ_POLLIN) {
+            uint16_t rawType = 0;
+            std::vector<uint8_t> body;
+            if (!RecvMessage(dealerSock_, rawType, body)) {
+                if (running_.load()) {
+                    std::cerr << "Recv error or server disconnected\n";
+                }
+                Disconnect();
+                if (running_.load() && spi_) {
+                    spi_->OnFrontDisconnected(0);
+                }
+                break;
             }
-            Disconnect();
-            if (running_.load() && spi_) {
-                spi_->OnFrontDisconnected(0);
+
+            auto msgType = static_cast<GatewayMsgType>(rawType);
+
+            // 处理应用层心跳 Pong
+            if (msgType == GatewayMsgType::kPong) {
+                lastPongTime_ = std::chrono::steady_clock::now();
+                missedPongs_ = 0;
+                continue;
             }
-            break;
+
+            // 仅处理登录响应
+            if (msgType != GatewayMsgType::kLoginResponse) {
+                std::cerr << "Unexpected message type on DEALER: " << rawType << "\n";
+                continue;
+            }
+
+            // bytes -> protobuf -> struct -> callback
+            gateway_proto::LoginResponse protoResp;
+            if (!protoResp.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                std::cerr << "Failed to parse response\n";
+                continue;
+            }
+
+            gateway::LoginResponse rsp = FromProtoResponse(protoResp);
+
+            if (spi_) {
+                spi_->OnLogin(rsp);
+            }
         }
 
-        auto msgType = static_cast<GatewayMsgType>(rawType);
+        // ---- SUB socket（广播订阅通道）----
+        if (items[1].revents & ZMQ_POLLIN) {
+            uint16_t rawType = 0;
+            std::vector<uint8_t> body;
+            if (!RecvMessage(subSock_, rawType, body)) {
+                if (running_.load()) {
+                    std::cerr << "SUB recv error\n";
+                }
+                // 短暂退避避免 recv 失败时忙等
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
 
-        // 处理应用层心跳 Pong
-        if (msgType == GatewayMsgType::kPong) {
-            lastPongTime_ = std::chrono::steady_clock::now();
-            missedPongs_ = 0;
-            continue;
-        }
+            auto msgType = static_cast<GatewayMsgType>(rawType);
+            if (msgType != GatewayMsgType::kBroadcastNotification) {
+                std::cerr << "Unexpected message type on SUB: " << rawType << "\n";
+                continue;
+            }
 
-        // 仅处理登录响应
-        if (msgType != GatewayMsgType::kLoginResponse) {
-            std::cerr << "Unexpected message type: " << rawType << "\n";
-            continue;
-        }
+            gateway_proto::BroadcastNotification protoNotif;
+            if (!protoNotif.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                std::cerr << "Failed to parse broadcast notification\n";
+                continue;
+            }
 
-        // bytes -> protobuf -> struct -> callback
-        gateway_proto::LoginResponse protoResp;
-        if (!protoResp.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            std::cerr << "Failed to parse response\n";
-            continue;
-        }
+            // 去重：服务端 slow-joiner 重发使用同一 message_id，客户端跳过重复
+            uint64_t msgId = protoNotif.message_id();
+            if (msgId != 0 && msgId == lastBroadcastId_) {
+                continue;  // 已处理过的重复消息
+            }
+            lastBroadcastId_ = msgId;
 
-        gateway::LoginResponse rsp = FromProtoResponse(protoResp);
+            gateway::BroadcastNotification notif;
+            notif.content = protoNotif.content();
+            notif.timestamp = protoNotif.timestamp();
+            notif.message_id = msgId;
 
-        if (spi_) {
-            spi_->OnLogin(rsp);
+            if (spi_) {
+                spi_->OnBroadcast(notif);
+            }
         }
     }
 }
@@ -245,6 +310,10 @@ void GatewayApiImpl::Disconnect() {
     if (dealerSock_) {
         CloseSocket(dealerSock_);
         dealerSock_ = nullptr;
+    }
+    if (subSock_) {
+        CloseSocket(subSock_);
+        subSock_ = nullptr;
     }
 }
 

@@ -34,6 +34,7 @@ public:
     void SetIdleTimeout(int seconds) override;
     bool Start(const char* bindAddr, int port) override;
     void Stop() override;
+    void BroadcastNotification(const std::string& content) override;
 
 private:
     void DispatchThreadFunc();
@@ -47,6 +48,9 @@ private:
     IGatewayHandler* handler_ = nullptr;
     ThreadPool* threadPool_ = nullptr;
     void* routerSock_ = nullptr;
+    void* pubSock_ = nullptr;
+    std::string bindAddr_;
+    int routerPort_ = 0;
     int maxConnections_ = 0;
     int idleTimeoutSec_ = 0;
     std::atomic<int> activeConnections_{0};

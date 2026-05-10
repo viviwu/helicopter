@@ -55,6 +55,24 @@ void* CreateDealerSocket() {
     return sock;
 }
 
+void* CreatePubSocket() {
+    void* sock = zmq_socket(GetZmqContext(), ZMQ_PUB);
+    if (sock) {
+        int linger = 0;
+        zmq_setsockopt(sock, ZMQ_LINGER, &linger, sizeof(linger));
+    }
+    return sock;
+}
+
+void* CreateSubSocket() {
+    void* sock = zmq_socket(GetZmqContext(), ZMQ_SUB);
+    if (sock) {
+        int linger = 0;
+        zmq_setsockopt(sock, ZMQ_LINGER, &linger, sizeof(linger));
+    }
+    return sock;
+}
+
 void CloseSocket(void* sock) {
     if (sock) {
         zmq_close(sock);
@@ -84,6 +102,10 @@ void SetZmqHeartbeat(void* sock, int ivlMs, int timeoutMs, int ttlMs) {
     zmq_setsockopt(sock, ZMQ_HEARTBEAT_IVL, &ivlMs, sizeof(ivlMs));
     zmq_setsockopt(sock, ZMQ_HEARTBEAT_TIMEOUT, &timeoutMs, sizeof(timeoutMs));
     zmq_setsockopt(sock, ZMQ_HEARTBEAT_TTL, &ttlMs, sizeof(ttlMs));
+}
+
+void SetSubSubscribe(void* sock, const char* filter) {
+    zmq_setsockopt(sock, ZMQ_SUBSCRIBE, filter, strlen(filter));
 }
 
 // ============================================================================
