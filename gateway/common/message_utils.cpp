@@ -258,3 +258,59 @@ bool SendRouterMessage(void* sock, const std::vector<uint8_t>& identity,
 
     return true;
 }
+
+// ============================================================================
+// PUB/SUB 端收发（3 帧：topic + msg_type + body）
+// topic 帧同时作为 ZMQ 订阅过滤前缀
+// ============================================================================
+
+bool SendPubMessage(void* sock, const std::string& topic,
+                    uint16_t msgType, const std::vector<uint8_t>& body) {
+    // Frame 0: topic (ZMQ subscription filter prefix, with SNDMORE)
+    if (!SendFrame(sock, topic.data(), topic.size(), true)) return false;
+
+    // Frame 1: msg_type (with SNDMORE)
+    if (!SendFrame(sock, &msgType, sizeof(msgType), true)) return false;
+
+    // Frame 2: body (last frame)
+    if (!SendFrame(sock, body.data(), body.size(), false)) return false;
+
+    return true;
+}
+
+bool RecvPubMessage(void* sock, std::string& outTopic,
+                    uint16_t& outMsgType, std::vector<uint8_t>& outBody) {
+    // Frame 0: topic
+    std::vector<uint8_t> topicFrame;
+    if (!RecvFrameToVector(sock, topicFrame)) return false;
+    outTopic.assign(topicFrame.begin(), topicFrame.end());
+
+    // Check for more frames
+    int more = 0;
+    size_t moreSz = sizeof(more);
+    zmq_getsockopt(sock, ZMQ_RCVMORE, &more, &moreSz);
+    if (!more) {
+        std::cerr << "RecvPubMessage: missing msg_type frame\n";
+        return false;
+    }
+
+    // Frame 1: msg_type
+    std::vector<uint8_t> typeFrame;
+    if (!RecvFrameToVector(sock, typeFrame)) return false;
+    if (typeFrame.size() < sizeof(uint16_t)) {
+        std::cerr << "RecvPubMessage: invalid msg_type frame size=" << typeFrame.size() << "\n";
+        return false;
+    }
+    std::memcpy(&outMsgType, typeFrame.data(), sizeof(uint16_t));
+
+    // Frame 2: body
+    zmq_getsockopt(sock, ZMQ_RCVMORE, &more, &moreSz);
+    if (!more) {
+        std::cerr << "RecvPubMessage: missing body frame\n";
+        return false;
+    }
+
+    if (!RecvFrameToVector(sock, outBody)) return false;
+
+    return true;
+}

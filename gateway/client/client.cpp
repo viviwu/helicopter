@@ -2,9 +2,9 @@
   ******************************************************************************
   * @file           : client.cpp
   * @author         : vivi wu
-  * @brief          : GatewayApi/SDK 交互式命令行菜单示例
-  * @version        : 0.2.0
-  * @date           : 09/05/26
+  * @brief          : 客户端 Demo（TradeGatewayApi + QuoteGatewayApi 双通道）
+  * @version        : 1.0.0
+  * @date           : 10/05/26
   ******************************************************************************
   */
 #include <iostream>
@@ -12,165 +12,207 @@
 #include <atomic>
 #include <csignal>
 
-// 业务层仅包含 GatewayApi.h，不暴露 gateway.pb.h
-#include "api/GatewayApi.h"
+#include "trade/TradeGatewayApi.h"
+#include "quote/QuoteGatewayApi.h"
 
-using namespace gateway;
+using namespace trade;
+using namespace quote;
 
-// ---------------------------------------------------------------------------
-// 用户自定义Spi：继承 GatewaySpi 并实现异步回调
-// ---------------------------------------------------------------------------
-class MyGatewaySpi : public GatewaySpi {
+// ============================================================================
+// 交易回调
+// ============================================================================
+class MyTradeSpi : public TradeSpi {
 public:
-    explicit MyGatewaySpi(std::atomic<bool>& loginDone)
-        : loginDone_(loginDone) {}
-
     void OnFrontConnected() override {
-        std::cout << "\n[MyGatewaySpi] OnFrontConnected" << std::endl;
+        std::cout << "\n[Trade] Connected" << std::endl;
+        connected_ = true;
     }
 
-    void OnFrontDisconnected(int nReason) override {
-        std::cout << "\n[MyGatewaySpi] OnFrontDisconnected, reason=" << nReason << std::endl;
-        connected_.store(false);
+    void OnFrontDisconnected(int reason) override {
+        std::cout << "\n[Trade] Disconnected (reason=" << reason << ")" << std::endl;
+        connected_ = false;
     }
 
     void OnLogin(const LoginResponse& rsp) override {
-        std::cout << "\n[MyGatewaySpi] OnLogin callback received:" << std::endl;
-        std::cout << "  request_id : " << rsp.request_id << std::endl;
-        if (rsp.error_code == ERR_OK) {
-            std::cout << "  error_code : 0 (OK)" << std::endl;
-            std::cout << "  error_msg  : " << rsp.error_msg << std::endl;
-            std::cout << "  account.user_id  : " << rsp.account.user_id << std::endl;
-            std::cout << "  account.username : " << rsp.account.username << std::endl;
-            std::cout << "  account.email    : " << rsp.account.email << std::endl;
-            std::cout << "  account.role     : " << rsp.account.role << std::endl;
+        std::cout << "\n[Trade] Login response:" << std::endl;
+        if (rsp.error_code == 0) {
+            std::cout << "  OK - user_id=" << rsp.account.user_id
+                      << " username=" << rsp.account.username << std::endl;
         } else {
-            std::cout << "  error_code : " << rsp.error_code << std::endl;
-            std::cout << "  error_msg  : " << rsp.error_msg << std::endl;
+            std::cout << "  FAILED - " << rsp.error_msg << std::endl;
         }
-        loginDone_.store(true);
     }
 
-    void OnBroadcast(const BroadcastNotification& notif) override {
-        std::cout << "\n[MyGatewaySpi] >>> BROADCAST received <<<" << std::endl;
-        std::cout << "  content   : " << notif.content << std::endl;
-        std::cout << "  timestamp : " << notif.timestamp << std::endl;
-        std::cout << "Press Enter to continue..." << std::endl;
+    void OnPlaceOrder(const PlaceOrderResponse& rsp) override {
+        std::cout << "\n[Trade] PlaceOrder response:" << std::endl;
+        if (rsp.error_code == 0) {
+            std::cout << "  OK - order_id=" << rsp.order_id << std::endl;
+        } else {
+            std::cout << "  FAILED - " << rsp.error_msg << std::endl;
+        }
+    }
+
+    void OnQueryOrder(const QueryOrderResponse& rsp) override {
+        std::cout << "\n[Trade] QueryOrder response:" << std::endl;
+        std::cout << "  order_id=" << rsp.order_id
+                  << " symbol=" << rsp.symbol
+                  << " status=" << rsp.status
+                  << " filled=" << rsp.filled_qty << std::endl;
     }
 
     std::atomic<bool> connected_{false};
-
-private:
-    std::atomic<bool>& loginDone_;
 };
 
-// ---------------------------------------------------------------------------
-// 菜单
-// ---------------------------------------------------------------------------
-static void printMenu(bool connected) {
-    std::cout << "\n========== Gateway SDK Demo ==========" << std::endl;
-    if (connected) {
-        std::cout << "Status: Connected" << std::endl;
-    } else {
-        std::cout << "Status: Disconnected" << std::endl;
+// ============================================================================
+// 行情回调
+// ============================================================================
+class MyQuoteSpi : public QuoteSpi {
+public:
+    void OnFrontConnected() override {
+        std::cout << "\n[Quote] Connected" << std::endl;
+        connected_ = true;
     }
-    std::cout << "--------------------------------------" << std::endl;
-    std::cout << "1. Connect to server" << std::endl;
-    std::cout << "2. Login" << std::endl;
-    std::cout << "3. Listen for broadcasts (press Enter to stop)" << std::endl;
-    std::cout << "4. Disconnect" << std::endl;
+
+    void OnFrontDisconnected(int reason) override {
+        std::cout << "\n[Quote] Disconnected (reason=" << reason << ")" << std::endl;
+        connected_ = false;
+    }
+
+    void OnMarketData(const MarketData& data) override {
+        std::cout << "\n[Quote] >>> MARKET DATA <<<" << std::endl;
+        std::cout << "  symbol : " << data.symbol << std::endl;
+        std::cout << "  price  : " << data.price << std::endl;
+        std::cout << "  volume : " << data.volume << std::endl;
+    }
+
+    void OnNotice(const Notice& notice) override {
+        std::cout << "\n[Quote] >>> NOTICE <<<" << std::endl;
+        std::cout << "  content : " << notice.content << std::endl;
+        std::cout << "  msg_id  : " << notice.message_id << std::endl;
+    }
+
+    std::atomic<bool> connected_{false};
+};
+
+// ============================================================================
+// 菜单
+// ============================================================================
+static void printMenu(bool tradeConnected, bool quoteConnected) {
+    std::cout << "\n========== Gateway Client Demo ==========" << std::endl;
+    std::cout << "Trade: " << (tradeConnected ? "Connected" : "Disconnected")
+              << " | Quote: " << (quoteConnected ? "Connected" : "Disconnected")
+              << std::endl;
+    std::cout << "------------------------------------------" << std::endl;
+    std::cout << "1. Connect TradeGateway + Login" << std::endl;
+    std::cout << "2. Place order (demo)" << std::endl;
+    std::cout << "3. Query order (demo)" << std::endl;
+    std::cout << "4. Connect QuoteGateway + Subscribe" << std::endl;
+    std::cout << "5. Listen for quote data (Enter to stop)" << std::endl;
+    std::cout << "6. Disconnect all" << std::endl;
     std::cout << "0. Exit" << std::endl;
-    std::cout << "======================================" << std::endl;
+    std::cout << "==========================================" << std::endl;
     std::cout << "Please select: ";
 }
 
-// ---------------------------------------------------------------------------
+// ============================================================================
 // main
-// ---------------------------------------------------------------------------
+// ============================================================================
 int main() {
-    GatewayApi* api = GatewayApi::CreateGatewayApi();
-    if (!api) {
-        std::cerr << "Failed to create GatewayApi" << std::endl;
-        return 1;
-    }
+    TradeGatewayApi tradeApi;
+    QuoteGatewayApi quoteApi;
 
-    std::atomic<bool> loginDone{false};
-    MyGatewaySpi spi(loginDone);
-    api->RegisterSpi(&spi);
+    MyTradeSpi tradeSpi;
+    MyQuoteSpi quoteSpi;
 
-    uint64_t nextReqId = 1;
+    tradeApi.RegisterSpi(&tradeSpi);
+    quoteApi.RegisterSpi(&quoteSpi);
+
     bool running = true;
+    uint64_t nextOrderId = 1;
 
     while (running) {
-        printMenu(spi.connected_.load());
+        printMenu(tradeSpi.connected_.load(), quoteSpi.connected_.load());
 
         std::string choice;
-        if (!std::getline(std::cin, choice)) {
-            break;
-        }
+        if (!std::getline(std::cin, choice)) break;
 
         if (choice == "1") {
-            if (spi.connected_.load()) {
-                std::cout << "Already connected. Disconnect first (option 4)." << std::endl;
+            // Connect TradeGateway
+            if (tradeApi.IsConnected()) {
+                std::cout << "Trade already connected." << std::endl;
                 continue;
             }
-            int ret = api->Init("127.0.0.1", 12345, 5);
-            if (ret == ERR_OK) {
-                spi.connected_ = true;
-                std::cout << "Connected to server (DEALER:12345 + SUB:12346)." << std::endl;
-            } else {
-                std::cerr << "Failed to connect to server." << std::endl;
+            int ret = tradeApi.Connect("127.0.0.1", 12345, 0, 5);
+            if (ret != 0) {
+                std::cerr << "Failed to connect TradeGateway." << std::endl;
+                continue;
             }
+            // Login
+            LoginRequest req;
+            req.request_id = 1;
+            req.username = "admin";
+            req.password = "123456";
+            tradeApi.Login(req);
+            std::cout << "Trade connected & login sent." << std::endl;
         }
         else if (choice == "2") {
-            if (!spi.connected_.load()) {
-                std::cerr << "Not connected. Connect first (option 1)." << std::endl;
+            if (!tradeSpi.connected_) {
+                std::cerr << "Trade not connected." << std::endl;
                 continue;
             }
-
-            std::string username, password;
-            std::cout << "Username: ";
-            std::getline(std::cin, username);
-            std::cout << "Password: ";
-            std::getline(std::cin, password);
-
-            LoginRequest req;
-            req.request_id = nextReqId++;
-            req.username   = std::move(username);
-            req.password   = std::move(password);
-
-            loginDone = false;
-            int ret = api->Login(req);
-            if (ret == ERR_OK) {
-                std::cout << "Login request sent, request_id=" << req.request_id << std::endl;
-            } else if (ret == ERR_NETWORK) {
-                std::cerr << "Login failed: not connected." << std::endl;
-            } else {
-                std::cerr << "Login failed: send error." << std::endl;
-            }
+            PlaceOrderRequest req;
+            req.request_id = nextOrderId++;
+            req.symbol = "BTC-USDT";
+            req.side = 1;       // buy
+            req.order_type = 1; // limit
+            req.price = 50000.0;
+            req.quantity = 0.1;
+            tradeApi.PlaceOrder(req);
+            std::cout << "PlaceOrder sent." << std::endl;
         }
         else if (choice == "3") {
-            if (!spi.connected_.load()) {
-                std::cerr << "Not connected. Connect first (option 1)." << std::endl;
+            if (!tradeSpi.connected_) {
+                std::cerr << "Trade not connected." << std::endl;
                 continue;
             }
-            std::cout << "\nListening for broadcast messages..." << std::endl;
-            std::cout << "(Broadcasts will appear above. Press Enter to stop listening.)"
-                      << std::endl;
-            std::cin.get();  // 阻塞等待 Enter
+            QueryOrderRequest req;
+            req.request_id = nextOrderId++;
+            req.order_id = 1000;
+            tradeApi.QueryOrder(req);
+            std::cout << "QueryOrder sent." << std::endl;
         }
         else if (choice == "4") {
-            if (!spi.connected_.load()) {
-                std::cout << "Already disconnected." << std::endl;
+            // Connect QuoteGateway (control :12346, data :12347)
+            if (quoteApi.IsConnected()) {
+                std::cout << "Quote already connected." << std::endl;
                 continue;
             }
-            api->Release();
-            api = GatewayApi::CreateGatewayApi();
-            api->RegisterSpi(&spi);
-            spi.connected_ = false;
-            loginDone = false;
-            nextReqId = 1;
-            std::cout << "Disconnected." << std::endl;
+            int ret = quoteApi.Connect("127.0.0.1", 12346);
+            if (ret != 0) {
+                std::cerr << "Failed to connect QuoteGateway." << std::endl;
+                continue;
+            }
+            // Subscribe to topics
+            quoteApi.Subscribe("notice");
+            quoteApi.Subscribe("market.BTC-USDT");
+            std::cout << "Quote connected & subscribed to 'notice' + 'market.BTC-USDT'."
+                      << std::endl;
+        }
+        else if (choice == "5") {
+            if (!quoteSpi.connected_) {
+                std::cerr << "Quote not connected." << std::endl;
+                continue;
+            }
+            std::cout << "\nListening for quote data..." << std::endl;
+            std::cout << "(Data will appear above. Press Enter to stop.)" << std::endl;
+            std::cin.get();
+        }
+        else if (choice == "6") {
+            tradeApi.Disconnect();
+            quoteApi.Disconnect();
+            tradeSpi.connected_ = false;
+            quoteSpi.connected_ = false;
+            std::cout << "All disconnected." << std::endl;
         }
         else if (choice == "0") {
             std::cout << "Exiting..." << std::endl;
@@ -181,6 +223,7 @@ int main() {
         }
     }
 
-    api->Release();
+    tradeApi.Disconnect();
+    quoteApi.Disconnect();
     return 0;
 }

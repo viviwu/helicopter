@@ -14,6 +14,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 // ============================================================================
@@ -95,5 +96,18 @@ bool RecvRouterMessage(void* sock, std::vector<uint8_t>& outIdentity,
 /// 通过 ROUTER socket 向指定 identity 发送回复（3 帧：identity + msg_type + body）
 bool SendRouterMessage(void* sock, const std::vector<uint8_t>& identity,
                        uint16_t msgType, const std::vector<uint8_t>& body);
+
+// ============================================================================
+// 消息收发（PUB/SUB 端 — 带 topic 帧，用于主题订阅过滤）
+// ============================================================================
+
+/// 通过 PUB socket 发送一条消息（3 帧：topic + msg_type + body）
+/// topic 作为 ZMQ 订阅过滤前缀，例如 "notice" 或 "market.BTC-USDT"
+bool SendPubMessage(void* sock, const std::string& topic,
+                    uint16_t msgType, const std::vector<uint8_t>& body);
+
+/// 从 SUB socket 接收一条消息（3 帧：topic + msg_type + body）
+bool RecvPubMessage(void* sock, std::string& outTopic,
+                    uint16_t& outMsgType, std::vector<uint8_t>& outBody);
 
 #endif //PROTO_GATEWAY_MESSAGE_UTILS_H
