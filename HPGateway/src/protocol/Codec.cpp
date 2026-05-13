@@ -37,7 +37,7 @@ void Codec::OnMessage(const std::shared_ptr<TcpConnection>& conn,
       }
       buf->Retrieve(len);
       if (messageCallback_) {
-        messageCallback_(packet, 0);
+        messageCallback_(packet, conn->GetConnId());
       }
     } else {
       break;

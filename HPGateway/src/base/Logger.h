@@ -38,6 +38,9 @@ class Logger {
 #define LOG_INFO(...)  ::gateway::Logger::Instance().GetLogger()->info(__VA_ARGS__)
 #define LOG_WARN(...)  ::gateway::Logger::Instance().GetLogger()->warn(__VA_ARGS__)
 #define LOG_ERROR(...) ::gateway::Logger::Instance().GetLogger()->error(__VA_ARGS__)
-#define LOG_FATAL(...) ::gateway::Logger::Instance().GetLogger()->critical(__VA_ARGS__)
+#define LOG_FATAL(...) do { \
+  ::gateway::Logger::Instance().GetLogger()->critical(__VA_ARGS__); \
+  ::abort(); \
+} while(0)
 
 #endif  // HELICOPTER_LOGGER_H

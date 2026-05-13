@@ -9,4 +9,6 @@ cmake ..
 make -j$(nproc)
 cd ..
 
-echo "Build success. Run ./build/gateway"
+echo "Build success. Run:"
+echo "  ./build/gateway       # start the gateway server"
+echo "  ./build/api_cli --demo # test with demo scenarios"

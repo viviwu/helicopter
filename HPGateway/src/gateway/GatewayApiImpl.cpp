@@ -11,8 +11,11 @@
 #include "GatewayApiImpl.h"
 #include "ConnectionManager.h"
 #include "SessionManager.h"
+#include "../protocol/Codec.h"
 #include "../base/Logger.h"
+#include "../base/Timestamp.h"
 #include <cassert>
+#include <cstring>
 
 namespace gateway {
 
@@ -22,6 +25,10 @@ GatewayApiImpl::GatewayApiImpl()
 
 GatewayApiImpl::~GatewayApiImpl() {
   Release();
+}
+
+uint32_t GatewayApiImpl::NextSeq() {
+  return seq_.fetch_add(1);
 }
 
 void GatewayApiImpl::RegisterSpi(GatewaySpi* spi) {
@@ -48,47 +55,113 @@ void GatewayApiImpl::Release() {
 }
 
 int GatewayApiImpl::ReqLogin(const LoginRequest* req, int requestId) {
-  LOG_INFO("ReqLogin account={}", req->account);
+  LOG_INFO("ReqLogin account={} requestId={}", req->account, requestId);
+  uint32_t seq = NextSeq();
+
+  Packet packet = Codec::Encode(kCmdLoginReq, seq, req, sizeof(LoginRequest));
+
+  RequestContext ctx;
+  ctx.connId = currentConnId_.load();
+  ctx.seq = seq;
+  ctx.cmd = kCmdLoginReq;
+  ctx.requestTime = Timestamp::Now().MilliSecondsSinceEpoch();
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    pendingRequests_[requestId] = ctx;
+  }
+
+  // Phase 1: packet would be sent to backend via IO thread
+  // For now, send back to client as echo if connected
+  if (ctx.connId > 0) {
+    SendToClient(ctx.connId, &packet, packet.TotalLength());
+  }
   return 0;
 }
 
 int GatewayApiImpl::ReqLogout(const LogoutRequest* req, int requestId) {
-  LOG_INFO("ReqLogout account={}", req->account);
+  LOG_INFO("ReqLogout account={} requestId={}", req->account, requestId);
+  uint32_t seq = NextSeq();
+  Packet packet = Codec::Encode(kCmdLogoutReq, seq, req, sizeof(LogoutRequest));
+
+  int64_t connId = currentConnId_.load();
+  if (connId > 0) {
+    SendToClient(connId, &packet, packet.TotalLength());
+  }
   return 0;
 }
 
 int GatewayApiImpl::ReqOrderInsert(const OrderRequest* req, int requestId) {
-  LOG_INFO("ReqOrderInsert symbol={} price={} volume={}", req->symbol, req->price, req->volume);
+  LOG_INFO("ReqOrderInsert symbol={} price={} volume={} requestId={}",
+           req->symbol, req->price, req->volume, requestId);
+  uint32_t seq = NextSeq();
+
+  Packet packet = Codec::Encode(kCmdOrderInsertReq, seq, req, sizeof(OrderRequest));
+
+  RequestContext ctx;
+  ctx.connId = currentConnId_.load();
+  ctx.seq = seq;
+  ctx.cmd = kCmdOrderInsertReq;
+  ctx.requestTime = Timestamp::Now().MilliSecondsSinceEpoch();
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    pendingRequests_[requestId] = ctx;
+  }
   return 0;
 }
 
 int GatewayApiImpl::ReqOrderCancel(const CancelOrderRequest* req, int requestId) {
-  LOG_INFO("ReqOrderCancel orderId={}", req->orderId);
+  LOG_INFO("ReqOrderCancel orderId={} requestId={}", req->orderId, requestId);
+  uint32_t seq = NextSeq();
+
+  Packet packet = Codec::Encode(kCmdOrderCancelReq, seq, req, sizeof(CancelOrderRequest));
+
+  RequestContext ctx;
+  ctx.connId = currentConnId_.load();
+  ctx.seq = seq;
+  ctx.cmd = kCmdOrderCancelReq;
+  ctx.requestTime = Timestamp::Now().MilliSecondsSinceEpoch();
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    pendingRequests_[requestId] = ctx;
+  }
   return 0;
 }
 
 int GatewayApiImpl::ReqQueryAccount(int requestId) {
-  LOG_INFO("ReqQueryAccount");
+  LOG_INFO("ReqQueryAccount requestId={}", requestId);
+  uint32_t seq = NextSeq();
+  RequestContext ctx;
+  ctx.connId = currentConnId_.load();
+  ctx.seq = seq;
+  ctx.cmd = 0;
+  ctx.requestTime = Timestamp::Now().MilliSecondsSinceEpoch();
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    pendingRequests_[requestId] = ctx;
+  }
   return 0;
 }
 
 int GatewayApiImpl::ReqQueryPosition(int requestId) {
-  LOG_INFO("ReqQueryPosition");
+  LOG_INFO("ReqQueryPosition requestId={}", requestId);
   return 0;
 }
 
 int GatewayApiImpl::ReqQueryOrder(int requestId) {
-  LOG_INFO("ReqQueryOrder");
+  LOG_INFO("ReqQueryOrder requestId={}", requestId);
   return 0;
 }
 
 int GatewayApiImpl::SubscribeQuote(const SubscribeQuoteRequest* req, int count) {
-  LOG_INFO("SubscribeQuote symbol={}", req->symbol);
+  LOG_INFO("SubscribeQuote symbol={} count={}", req->symbol, count);
+  for (int i = 0; i < count; ++i) {
+    LOG_DEBUG("  subscribe {}.{}", req[i].symbol, req[i].exchange);
+  }
   return 0;
 }
 
 int GatewayApiImpl::UnSubscribeQuote(const UnSubscribeQuoteRequest* req, int count) {
-  LOG_INFO("UnSubscribeQuote symbol={}", req->symbol);
+  LOG_INFO("UnSubscribeQuote symbol={} count={}", req->symbol, count);
   return 0;
 }
 

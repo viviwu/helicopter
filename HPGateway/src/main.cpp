@@ -19,20 +19,34 @@
 
 using namespace gateway;
 
+namespace {
+
+volatile sig_atomic_t g_running = 1;
+
 void SignalHandler(int sig) {
   LOG_INFO("Receive signal {}, exiting...", sig);
+  g_running = 0;
 }
+
+}  // namespace
 
 int main(int argc, char* argv[]) {
   (void)argc;
   (void)argv;
 
+  // 先用默认级别初始化日志（以便 LoadConfig 能输出日志）
   Logger::Instance().Init("gateway", "info");
-  LOG_INFO("HPGateway starting...");
 
+  // 加载配置
   GatewayContext::Instance().LoadConfig("conf/gateway.yaml");
-
   const GatewayConfig& cfg = GatewayContext::Instance().Config();
+
+  // 按配置级别重新设置日志
+  if (cfg.logLevel != "info") {
+    Logger::Instance().Init("gateway", cfg.logLevel);
+  }
+
+  LOG_INFO("HPGateway starting...");
 
   struct sockaddr_in listenAddr;
   sockets::FromIpPort(cfg.tradeBindIp.c_str(), cfg.tradePort, &listenAddr);
@@ -46,7 +60,12 @@ int main(int argc, char* argv[]) {
   api.Init();
 
   server.Start();
-  LOG_INFO("Gateway listening on {}:{}", cfg.tradeBindIp, cfg.tradePort);
+  LOG_INFO("Gateway listening on {}:{}, ioThreads={}, workerThreads={}",
+           cfg.tradeBindIp, cfg.tradePort,
+           cfg.ioThreadNum, cfg.workerThreadNum);
+
+  ::signal(SIGINT, SignalHandler);
+  ::signal(SIGTERM, SignalHandler);
 
   loop.Loop();
 

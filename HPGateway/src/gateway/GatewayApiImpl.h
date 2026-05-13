@@ -15,8 +15,18 @@
 #include "gateway/QuoteGatewayApi.h"
 #include "gateway/GatewaySpi.h"
 #include <atomic>
+#include <map>
+#include <mutex>
+#include <cstdint>
 
 namespace gateway {
+
+struct RequestContext {
+  int64_t connId;
+  uint32_t seq;
+  uint16_t cmd;
+  uint64_t requestTime;
+};
 
 class GatewayApiImpl : public TradeGatewayApi, public QuoteGatewayApi {
  public:
@@ -41,12 +51,21 @@ class GatewayApiImpl : public TradeGatewayApi, public QuoteGatewayApi {
   int SubscribeQuote(const SubscribeQuoteRequest* req, int count) override;
   int UnSubscribeQuote(const UnSubscribeQuoteRequest* req, int count) override;
 
-  bool SendToClient(int64_t connId, const void* data, uint32_t len);
-  bool Broadcast(const void* data, uint32_t len);
+  bool SendToClient(int64_t connId, const void* data, uint32_t len) override;
+  bool Broadcast(const void* data, uint32_t len) override;
+
+  void SetCurrentConnId(int64_t connId) { currentConnId_ = connId; }
 
  private:
+  uint32_t NextSeq();
+
   GatewaySpi* spi_;
   std::atomic<bool> initialized_;
+  std::atomic<uint32_t> seq_{1};
+  std::atomic<int64_t> currentConnId_{0};
+
+  mutable std::mutex mutex_;
+  std::map<int, RequestContext> pendingRequests_;
 };
 
 }

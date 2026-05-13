@@ -12,6 +12,7 @@
 #define HELICOPTER_RINGBUFFER_H
 
 #include <vector>
+#include <string>
 #include <algorithm>
 #include <cassert>
 #include <cstring>

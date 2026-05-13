@@ -67,6 +67,11 @@ set(MAIN_SRC
   src/main.cpp
 )
 
+set(API_CLI_SRC
+  src/api_cli/ApiClient.cpp
+  src/api_cli/main.cpp
+)
+
 add_executable(gateway
   ${NET_SRC}
   ${BASE_SRC}
@@ -76,6 +81,12 @@ add_executable(gateway
   ${MAIN_SRC}
 )
 
+add_executable(api_cli
+  ${API_CLI_SRC}
+)
+
 target_link_libraries(gateway spdlog::spdlog)
 
 target_link_libraries(gateway pthread)
+
+target_link_libraries(api_cli pthread)

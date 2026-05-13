@@ -24,6 +24,8 @@ struct GatewayConfig {
   int ioThreadNum = 4;
   int workerThreadNum = 4;
   int maxConnections = 10000;
+  int heartbeatTimeout = 60;
+  std::string logLevel = "info";
 };
 
 class GatewayContext {
@@ -37,6 +39,10 @@ class GatewayContext {
 
  private:
   GatewayContext() = default;
+
+  void ParseLine(const std::string& line);
+  static std::string Trim(const std::string& s);
+
   GatewayConfig config_;
 };
 

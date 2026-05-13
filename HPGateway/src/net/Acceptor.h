@@ -12,6 +12,7 @@
 #define HELICOPTER_ACCEPTOR_H
 
 #include <functional>
+#include <memory>
 #include <netinet/in.h>
 #include "../base/NonCopyable.h"
 
