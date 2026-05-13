@@ -29,7 +29,7 @@ public:
 };
 
 /// 交易网关客户端 SDK
-class TradeGatewayApi : public framework::GatewayApi {
+class TradeApi : public framework::GatewayApi {
 public:
     void RegisterSpi(TradeSpi* spi) { spi_ = spi; }
 

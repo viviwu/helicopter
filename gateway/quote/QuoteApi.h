@@ -33,7 +33,7 @@ public:
 /// 行情网关客户端 SDK
 /// 通过 SUB socket 连接 QuoteGatewayServer 的 PUB 端口，
 /// 使用本地 Subscribe/Unsubscribe 管理主题过滤。
-class QuoteGatewayApi : public framework::GatewayApi {
+class QuoteApi : public framework::GatewayApi {
 public:
     void RegisterSpi(QuoteSpi* spi) { spi_ = spi; }
 
