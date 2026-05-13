@@ -1,17 +1,17 @@
 /**
-  ******************************************************************************
-  * @file           : TradeApi.h
-  * @author         : vivi wu
-  * @brief          : 交易网关客户端 SDK（DEALER 模式）
-  * @version        : 0.1.0
-  * @date           : 10/05/26
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : TradeApi.h
+ * @author         : vivi wu
+ * @brief          : 交易网关客户端 SDK（DEALER 模式）
+ * @version        : 0.2.0
+ * @date           : 13/05/26
+ ******************************************************************************
+ */
 #ifndef TRADE_TRADE_API_H
 #define TRADE_TRADE_API_H
 
-#include "framework/GatewayApi.h"
 #include "trade/TradeTypes.h"
+#include "trade/trade_api_zmq_impl.h"
 
 namespace trade {
 
@@ -29,9 +29,19 @@ public:
 };
 
 /// 交易网关客户端 SDK
-class TradeApi : public framework::GatewayApi {
+class TradeApi {
 public:
+    TradeApi();
+    ~TradeApi();
+
+    TradeApi(const TradeApi&) = delete;
+    TradeApi& operator=(const TradeApi&) = delete;
+
     void RegisterSpi(TradeSpi* spi) { spi_ = spi; }
+
+    int Connect(const char* address, int routerPort, int heartbeatSec);
+    void Disconnect();
+    bool IsConnected() const { return zmq_impl_.IsConnected(); }
 
     // 交易 API
     int Login(const LoginRequest& req);
@@ -39,16 +49,10 @@ public:
     int QueryOrder(const QueryOrderRequest& req);
     int CancelOrder(const CancelOrderRequest& req);
 
-protected:
-    void OnConnected() override;
-    void OnDisconnected(int reason) override;
-    void OnRouterMessage(uint16_t msgType, const std::vector<uint8_t>& body) override;
-    void OnPubMessage(const std::string& topic, uint16_t msgType,
-                      const std::vector<uint8_t>& body) override;
-
 private:
     TradeSpi* spi_ = nullptr;
-    uint64_t lastBroadcastId_ = 0;  // dedup for notice messages if received
+    TradeApiZmqImpl zmq_impl_;
+    uint64_t lastBroadcastId_ = 0;
 };
 
 } // namespace trade

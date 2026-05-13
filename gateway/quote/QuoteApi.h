@@ -1,17 +1,17 @@
 /**
-  ******************************************************************************
-  * @file           : QuoteApi.h
-  * @author         : vivi wu
-  * @brief          : 行情网关客户端 SDK（纯 SUB 模式 / 本地主题订阅）
-  * @version        : 0.2.0
-  * @date           : 10/05/26
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : QuoteApi.h
+ * @author         : vivi wu
+ * @brief          : 行情网关客户端 SDK（纯 SUB 模式 / 本地主题订阅）
+ * @version        : 0.3.0
+ * @date           : 13/05/26
+ ******************************************************************************
+ */
 #ifndef QUOTE_QUOTE_API_H
 #define QUOTE_QUOTE_API_H
 
-#include "framework/GatewayApi.h"
 #include "quote/QuoteTypes.h"
+#include "quote/quote_api_zmq_impl.h"
 
 namespace quote {
 
@@ -33,29 +33,27 @@ public:
 /// 行情网关客户端 SDK
 /// 通过 SUB socket 连接 QuoteGatewayServer 的 PUB 端口，
 /// 使用本地 Subscribe/Unsubscribe 管理主题过滤。
-class QuoteApi : public framework::GatewayApi {
+class QuoteApi {
 public:
+    QuoteApi();
+    ~QuoteApi();
+
+    QuoteApi(const QuoteApi&) = delete;
+    QuoteApi& operator=(const QuoteApi&) = delete;
+
     void RegisterSpi(QuoteSpi* spi) { spi_ = spi; }
 
-    /// 连接到 QuoteGatewayServer（纯 SUB 模式）
-    /// @param address  QuoteGatewayServer 地址
-    /// @param pubPort  PUB 端口
-    /// @return 0-成功
     int Connect(const char* address, int pubPort);
+    void Disconnect();
+    bool IsConnected() const { return zmq_impl_.IsConnected(); }
 
-    using GatewayApi::Subscribe;    // 继承基类方法
-    using GatewayApi::Unsubscribe;  // 继承基类方法
-
-protected:
-    void OnConnected() override;
-    void OnDisconnected(int reason) override;
-    void OnRouterMessage(uint16_t msgType, const std::vector<uint8_t>& body) override;
-    void OnPubMessage(const std::string& topic, uint16_t msgType,
-                      const std::vector<uint8_t>& body) override;
+    bool Subscribe(const std::string& topic) { return zmq_impl_.Subscribe(topic); }
+    bool Unsubscribe(const std::string& topic) { return zmq_impl_.Unsubscribe(topic); }
 
 private:
     QuoteSpi* spi_ = nullptr;
-    uint64_t lastNoticeId_ = 0;   // 通知去重
+    QuoteApiZmqImpl zmq_impl_;
+    uint64_t lastNoticeId_ = 0;
 };
 
 } // namespace quote

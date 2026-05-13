@@ -1,12 +1,12 @@
 /**
-  ******************************************************************************
-  * @file           : QuoteApi.cpp
-  * @author         : vivi wu
-  * @brief          : 行情网关客户端 SDK 实现（纯 SUB 模式 / 本地订阅）
-  * @version        : 0.2.0
-  * @date           : 10/05/26
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : QuoteApi.cpp
+ * @author         : vivi wu
+ * @brief          : 行情网关客户端 SDK 实现（纯 SUB 模式 / 本地订阅）
+ * @version        : 0.3.0
+ * @date           : 13/05/26
+ ******************************************************************************
+ */
 #include "quote/QuoteApi.h"
 
 #include "quote.pb.h"
@@ -16,71 +16,70 @@
 namespace quote {
 
 // ============================================================================
-// 连接
+// 构造 / 析构
+// ============================================================================
+
+QuoteApi::QuoteApi() {
+    zmq_impl_.on_connected = [this]() {
+        if (spi_) spi_->OnFrontConnected();
+    };
+    zmq_impl_.on_disconnected = [this](int reason) {
+        if (spi_) spi_->OnFrontDisconnected(reason);
+    };
+    zmq_impl_.on_pub_message = [this](const std::string& topic, uint16_t msgType,
+                                       const std::vector<uint8_t>& body) {
+        if (!spi_) return;
+
+        auto type = static_cast<QuoteMsgType>(msgType);
+
+        switch (type) {
+        case QuoteMsgType::kMarketData: {
+            quote_proto::MarketData proto;
+            if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                MarketData md;
+                md.symbol    = proto.symbol();
+                md.price     = proto.price();
+                md.volume    = proto.volume();
+                md.timestamp = proto.timestamp();
+                spi_->OnMarketData(md);
+            }
+            break;
+        }
+        case QuoteMsgType::kNotice: {
+            quote_proto::Notice proto;
+            if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                uint64_t msgId = proto.message_id();
+                if (msgId != 0 && msgId == lastNoticeId_) {
+                    return;  // duplicate
+                }
+                lastNoticeId_ = msgId;
+
+                Notice notice;
+                notice.content    = proto.content();
+                notice.timestamp  = proto.timestamp();
+                notice.message_id = msgId;
+                spi_->OnNotice(notice);
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    };
+}
+
+QuoteApi::~QuoteApi() = default;
+
+// ============================================================================
+// 连接管理
 // ============================================================================
 
 int QuoteApi::Connect(const char* address, int pubPort) {
-    // routerPort=0 表示纯 SUB 模式（无 DEALER），heartbeatSec 忽略
-    return GatewayApi::Connect(address, 0, pubPort, 0);
+    return zmq_impl_.Connect(address, pubPort);
 }
 
-// ============================================================================
-// 回调
-// ============================================================================
-
-void QuoteApi::OnConnected() {
-    if (spi_) spi_->OnFrontConnected();
-}
-
-void QuoteApi::OnDisconnected(int reason) {
-    if (spi_) spi_->OnFrontDisconnected(reason);
-}
-
-void QuoteApi::OnRouterMessage(uint16_t /*msgType*/,
-                                const std::vector<uint8_t>& /*body*/) {
-    // 纯 SUB 模式，不会有 Router 消息
-}
-
-void QuoteApi::OnPubMessage(const std::string& topic, uint16_t msgType,
-                             const std::vector<uint8_t>& body) {
-    if (!spi_) return;
-
-    auto type = static_cast<QuoteMsgType>(msgType);
-
-    switch (type) {
-    case QuoteMsgType::kMarketData: {
-        quote_proto::MarketData proto;
-        if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            MarketData md;
-            md.symbol    = proto.symbol();
-            md.price     = proto.price();
-            md.volume    = proto.volume();
-            md.timestamp = proto.timestamp();
-            spi_->OnMarketData(md);
-        }
-        break;
-    }
-    case QuoteMsgType::kNotice: {
-        quote_proto::Notice proto;
-        if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            // 去重
-            uint64_t msgId = proto.message_id();
-            if (msgId != 0 && msgId == lastNoticeId_) {
-                return;  // duplicate
-            }
-            lastNoticeId_ = msgId;
-
-            Notice notice;
-            notice.content    = proto.content();
-            notice.timestamp  = proto.timestamp();
-            notice.message_id = msgId;
-            spi_->OnNotice(notice);
-        }
-        break;
-    }
-    default:
-        break;
-    }
+void QuoteApi::Disconnect() {
+    zmq_impl_.Disconnect();
 }
 
 } // namespace quote

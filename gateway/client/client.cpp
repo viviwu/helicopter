@@ -142,7 +142,7 @@ int main() {
                 std::cout << "Trade already connected." << std::endl;
                 continue;
             }
-            int ret = tradeApi.Connect("127.0.0.1", 12345, 0, 5);
+            int ret = tradeApi.Connect("127.0.0.1", 12345, 5);
             if (ret != 0) {
                 std::cerr << "Failed to connect TradeGateway." << std::endl;
                 continue;

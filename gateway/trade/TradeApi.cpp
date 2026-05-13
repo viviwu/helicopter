@@ -1,12 +1,12 @@
 /**
-  ******************************************************************************
-  * @file           : TradeApi.cpp
-  * @author         : vivi wu
-  * @brief          : 交易网关客户端 SDK 实现
-  * @version        : 0.1.0
-  * @date           : 10/05/26
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : TradeApi.cpp
+ * @author         : vivi wu
+ * @brief          : 交易网关客户端 SDK 实现
+ * @version        : 0.2.0
+ * @date           : 13/05/26
+ ******************************************************************************
+ */
 #include "trade/TradeApi.h"
 
 // protobuf 仅在实现文件中可见
@@ -98,6 +98,71 @@ static CancelOrderResponse FromProto(const trade_proto::CancelOrderResponse& p) 
 }
 
 // ============================================================================
+// 构造 / 析构
+// ============================================================================
+
+TradeApi::TradeApi() {
+    zmq_impl_.on_connected = [this]() {
+        if (spi_) spi_->OnFrontConnected();
+    };
+    zmq_impl_.on_disconnected = [this](int reason) {
+        if (spi_) spi_->OnFrontDisconnected(reason);
+    };
+    zmq_impl_.on_message = [this](uint16_t msgType, const std::vector<uint8_t>& body) {
+        if (!spi_) return;
+
+        auto type = static_cast<TradeMsgType>(msgType);
+
+        switch (type) {
+        case TradeMsgType::kLoginResponse: {
+            trade_proto::LoginResponse proto;
+            if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                spi_->OnLogin(FromProto(proto));
+            }
+            break;
+        }
+        case TradeMsgType::kPlaceOrderResponse: {
+            trade_proto::PlaceOrderResponse proto;
+            if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                spi_->OnPlaceOrder(FromProto(proto));
+            }
+            break;
+        }
+        case TradeMsgType::kQueryOrderResponse: {
+            trade_proto::QueryOrderResponse proto;
+            if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                spi_->OnQueryOrder(FromProto(proto));
+            }
+            break;
+        }
+        case TradeMsgType::kCancelOrderResponse: {
+            trade_proto::CancelOrderResponse proto;
+            if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
+                spi_->OnCancelOrder(FromProto(proto));
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    };
+}
+
+TradeApi::~TradeApi() = default;
+
+// ============================================================================
+// 连接管理
+// ============================================================================
+
+int TradeApi::Connect(const char* address, int routerPort, int heartbeatSec) {
+    return zmq_impl_.Connect(address, routerPort, heartbeatSec);
+}
+
+void TradeApi::Disconnect() {
+    zmq_impl_.Disconnect();
+}
+
+// ============================================================================
 // API 方法
 // ============================================================================
 
@@ -105,7 +170,7 @@ int TradeApi::Login(const LoginRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
-    if (!SendToRouter(static_cast<uint16_t>(TradeMsgType::kLoginRequest), body)) {
+    if (!zmq_impl_.Send(static_cast<uint16_t>(TradeMsgType::kLoginRequest), body)) {
         return ERR_SEND_FAILED;
     }
     return ERR_OK;
@@ -115,7 +180,7 @@ int TradeApi::PlaceOrder(const PlaceOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
-    if (!SendToRouter(static_cast<uint16_t>(TradeMsgType::kPlaceOrderRequest), body)) {
+    if (!zmq_impl_.Send(static_cast<uint16_t>(TradeMsgType::kPlaceOrderRequest), body)) {
         return ERR_SEND_FAILED;
     }
     return ERR_OK;
@@ -125,7 +190,7 @@ int TradeApi::QueryOrder(const QueryOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
-    if (!SendToRouter(static_cast<uint16_t>(TradeMsgType::kQueryOrderRequest), body)) {
+    if (!zmq_impl_.Send(static_cast<uint16_t>(TradeMsgType::kQueryOrderRequest), body)) {
         return ERR_SEND_FAILED;
     }
     return ERR_OK;
@@ -135,66 +200,10 @@ int TradeApi::CancelOrder(const CancelOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
-    if (!SendToRouter(static_cast<uint16_t>(TradeMsgType::kCancelOrderRequest), body)) {
+    if (!zmq_impl_.Send(static_cast<uint16_t>(TradeMsgType::kCancelOrderRequest), body)) {
         return ERR_SEND_FAILED;
     }
     return ERR_OK;
-}
-
-// ============================================================================
-// 回调
-// ============================================================================
-
-void TradeApi::OnConnected() {
-    if (spi_) spi_->OnFrontConnected();
-}
-
-void TradeApi::OnDisconnected(int reason) {
-    if (spi_) spi_->OnFrontDisconnected(reason);
-}
-
-void TradeApi::OnRouterMessage(uint16_t msgType, const std::vector<uint8_t>& body) {
-    if (!spi_) return;
-
-    auto type = static_cast<TradeMsgType>(msgType);
-
-    switch (type) {
-    case TradeMsgType::kLoginResponse: {
-        trade_proto::LoginResponse proto;
-        if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            spi_->OnLogin(FromProto(proto));
-        }
-        break;
-    }
-    case TradeMsgType::kPlaceOrderResponse: {
-        trade_proto::PlaceOrderResponse proto;
-        if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            spi_->OnPlaceOrder(FromProto(proto));
-        }
-        break;
-    }
-    case TradeMsgType::kQueryOrderResponse: {
-        trade_proto::QueryOrderResponse proto;
-        if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            spi_->OnQueryOrder(FromProto(proto));
-        }
-        break;
-    }
-    case TradeMsgType::kCancelOrderResponse: {
-        trade_proto::CancelOrderResponse proto;
-        if (proto.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            spi_->OnCancelOrder(FromProto(proto));
-        }
-        break;
-    }
-    default:
-        break;
-    }
-}
-
-void TradeApi::OnPubMessage(const std::string& /*topic*/, uint16_t /*msgType*/,
-                             const std::vector<uint8_t>& /*body*/) {
-    // TradeApi 不订阅 PUB 消息
 }
 
 } // namespace trade

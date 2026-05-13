@@ -74,7 +74,6 @@ target_include_directories(thread_pool PUBLIC ${CMAKE_SOURCE_DIR}/common)
 add_library(gateway_framework STATIC
   framework/RouterServer.cpp
   framework/PubServer.cpp
-  framework/GatewayApi.cpp
 )
 target_include_directories(gateway_framework PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(gateway_framework PUBLIC message_utils thread_pool)
@@ -86,7 +85,7 @@ target_include_directories(trade_server PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(trade_server PUBLIC gateway_framework trade_proto_gen)
 
 # TradeApi (client-side SDK)
-add_library(trade_api STATIC trade/TradeApi.cpp)
+add_library(trade_api STATIC trade/TradeApi.cpp trade/trade_api_zmq_impl.cpp)
 target_include_directories(trade_api PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(trade_api PUBLIC gateway_framework trade_proto_gen)
 
@@ -97,7 +96,7 @@ target_include_directories(quote_server PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(quote_server PUBLIC gateway_framework quote_proto_gen)
 
 # QuoteApi (client-side SDK)
-add_library(quote_api STATIC quote/QuoteApi.cpp)
+add_library(quote_api STATIC quote/QuoteApi.cpp quote/quote_api_zmq_impl.cpp)
 target_include_directories(quote_api PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(quote_api PUBLIC gateway_framework quote_proto_gen)
 
