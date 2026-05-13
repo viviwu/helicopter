@@ -1,6 +1,6 @@
 /**
  **************************************************************************
- * @file    :TradeGatewayApi.h
+ * @file    :TradeApi.h
  * @author  :viviwu
  * @brief   :TODO
  * @version :0.1
@@ -18,7 +18,7 @@
 
 namespace gateway {
 
-class TradeGatewayApi : public GatewayApi {
+class TradeApi : public GatewayApi {
 public:
 
   virtual int ReqLogin(

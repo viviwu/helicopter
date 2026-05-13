@@ -25,7 +25,7 @@ struct QuoteTopic {
 
 /// 行情网关服务端
 /// 基于 PubServer，发布行情数据和通知到指定 topic。
-/// 客户端通过 QuoteGatewayApi 的 SUB socket 本地订阅/取消订阅。
+/// 客户端通过 QuoteApi 的 SUB socket 本地订阅/取消订阅。
 class QuoteGatewayServer {
 public:
     QuoteGatewayServer() = default;

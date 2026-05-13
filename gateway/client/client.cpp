@@ -2,7 +2,7 @@
   ******************************************************************************
   * @file           : client.cpp
   * @author         : vivi wu
-  * @brief          : 客户端 Demo（TradeGatewayApi + QuoteGatewayApi 双通道）
+  * @brief          : 客户端 Demo（TradeApi + QuoteApi 双通道）
   * @version        : 1.0.0
   * @date           : 10/05/26
   ******************************************************************************
@@ -12,8 +12,8 @@
 #include <atomic>
 #include <csignal>
 
-#include "trade/TradeGatewayApi.h"
-#include "quote/QuoteGatewayApi.h"
+#include "trade/TradeApi.h"
+#include "quote/QuoteApi.h"
 
 using namespace trade;
 using namespace quote;
@@ -118,8 +118,8 @@ static void printMenu(bool tradeConnected, bool quoteConnected) {
 // main
 // ============================================================================
 int main() {
-    TradeGatewayApi tradeApi;
-    QuoteGatewayApi quoteApi;
+    TradeApi tradeApi;
+    QuoteApi quoteApi;
 
     MyTradeSpi tradeSpi;
     MyQuoteSpi quoteSpi;

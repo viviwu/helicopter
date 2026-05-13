@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file           : QuoteGatewayApi.h
+  * @file           : QuoteApi.h
   * @author         : vivi wu
   * @brief          : 行情网关客户端 SDK（纯 SUB 模式 / 本地主题订阅）
   * @version        : 0.2.0

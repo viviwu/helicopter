@@ -112,7 +112,7 @@ HPGateway 是一个基于 Linux + epoll 的高性能交易接入网关。
 ```text
 Client
     ↓
-TradeGatewayApi / QuoteGatewayApi
+TradeApi / QuoteApi
     ↓
 GatewaySpi callback
 ```

@@ -67,7 +67,7 @@ class ApiClient {
   ResponseCallback responseCb_;
 };
 
-// ---- 便捷包装函数：使用 ApiClient 模拟 TradeGatewayApi / QuoteGatewayApi 接口 ----
+// ---- 便捷包装函数：使用 ApiClient 模拟 TradeApi / QuoteApi 接口 ----
 
 struct TradeApiDemo {
   explicit TradeApiDemo(ApiClient* client) : client_(client) {}

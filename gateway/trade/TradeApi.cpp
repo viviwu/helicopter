@@ -1,13 +1,13 @@
 /**
   ******************************************************************************
-  * @file           : TradeGatewayApi.cpp
+  * @file           : TradeApi.cpp
   * @author         : vivi wu
   * @brief          : 交易网关客户端 SDK 实现
   * @version        : 0.1.0
   * @date           : 10/05/26
   ******************************************************************************
   */
-#include "trade/TradeGatewayApi.h"
+#include "trade/TradeApi.h"
 
 // protobuf 仅在实现文件中可见
 #include "trade.pb.h"
@@ -101,7 +101,7 @@ static CancelOrderResponse FromProto(const trade_proto::CancelOrderResponse& p) 
 // API 方法
 // ============================================================================
 
-int TradeGatewayApi::Login(const LoginRequest& req) {
+int TradeApi::Login(const LoginRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -111,7 +111,7 @@ int TradeGatewayApi::Login(const LoginRequest& req) {
     return ERR_OK;
 }
 
-int TradeGatewayApi::PlaceOrder(const PlaceOrderRequest& req) {
+int TradeApi::PlaceOrder(const PlaceOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -121,7 +121,7 @@ int TradeGatewayApi::PlaceOrder(const PlaceOrderRequest& req) {
     return ERR_OK;
 }
 
-int TradeGatewayApi::QueryOrder(const QueryOrderRequest& req) {
+int TradeApi::QueryOrder(const QueryOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -131,7 +131,7 @@ int TradeGatewayApi::QueryOrder(const QueryOrderRequest& req) {
     return ERR_OK;
 }
 
-int TradeGatewayApi::CancelOrder(const CancelOrderRequest& req) {
+int TradeApi::CancelOrder(const CancelOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -145,15 +145,15 @@ int TradeGatewayApi::CancelOrder(const CancelOrderRequest& req) {
 // 回调
 // ============================================================================
 
-void TradeGatewayApi::OnConnected() {
+void TradeApi::OnConnected() {
     if (spi_) spi_->OnFrontConnected();
 }
 
-void TradeGatewayApi::OnDisconnected(int reason) {
+void TradeApi::OnDisconnected(int reason) {
     if (spi_) spi_->OnFrontDisconnected(reason);
 }
 
-void TradeGatewayApi::OnRouterMessage(uint16_t msgType, const std::vector<uint8_t>& body) {
+void TradeApi::OnRouterMessage(uint16_t msgType, const std::vector<uint8_t>& body) {
     if (!spi_) return;
 
     auto type = static_cast<TradeMsgType>(msgType);
@@ -192,9 +192,9 @@ void TradeGatewayApi::OnRouterMessage(uint16_t msgType, const std::vector<uint8_
     }
 }
 
-void TradeGatewayApi::OnPubMessage(const std::string& /*topic*/, uint16_t /*msgType*/,
+void TradeApi::OnPubMessage(const std::string& /*topic*/, uint16_t /*msgType*/,
                              const std::vector<uint8_t>& /*body*/) {
-    // TradeGatewayApi 不订阅 PUB 消息
+    // TradeApi 不订阅 PUB 消息
 }
 
 } // namespace trade

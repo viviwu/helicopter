@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file           : TradeGatewayApi.h
+  * @file           : TradeApi.h
   * @author         : vivi wu
   * @brief          : 交易网关客户端 SDK（DEALER 模式）
   * @version        : 0.1.0

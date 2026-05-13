@@ -11,8 +11,8 @@
 #ifndef HELICOPTER_GATEWAYAPIIMPL_H
 #define HELICOPTER_GATEWAYAPIIMPL_H
 
-#include "gateway/TradeGatewayApi.h"
-#include "gateway/QuoteGatewayApi.h"
+#include "gateway/TradeApi.h"
+#include "gateway/QuoteApi.h"
 #include "gateway/GatewaySpi.h"
 #include <atomic>
 #include <map>
@@ -28,7 +28,7 @@ struct RequestContext {
   uint64_t requestTime;
 };
 
-class GatewayApiImpl : public TradeGatewayApi, public QuoteGatewayApi {
+class GatewayApiImpl : public TradeApi, public QuoteApi {
  public:
   GatewayApiImpl();
   ~GatewayApiImpl() override;

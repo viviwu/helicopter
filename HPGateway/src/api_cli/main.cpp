@@ -41,7 +41,7 @@ static void SignalHandler(int) {
 static void DemoTradeApi(ApiClient& client) {
   printf("\n");
   printf("========================================\n");
-  printf("  TradeGatewayApi Demo\n");
+  printf("  TradeApi Demo\n");
   printf("========================================\n");
 
   TradeApiDemo trade(&client);
@@ -99,7 +99,7 @@ static void DemoTradeApi(ApiClient& client) {
 static void DemoQuoteApi(ApiClient& client) {
   printf("\n");
   printf("========================================\n");
-  printf("  QuoteGatewayApi Demo\n");
+  printf("  QuoteApi Demo\n");
   printf("========================================\n");
 
   QuoteApiDemo quote(&client);

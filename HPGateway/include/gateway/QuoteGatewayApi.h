@@ -1,6 +1,6 @@
 /**
  **************************************************************************
- * @file    :QuoteGatewayApi.h
+ * @file    :QuoteApi.h
  * @author  :viviwu
  * @brief   :TODO
  * @version :0.1
@@ -18,7 +18,7 @@
 
 namespace gateway {
 
-class QuoteGatewayApi : public GatewayApi {
+class QuoteApi : public GatewayApi {
 public:
 
   virtual int ReqLogin(

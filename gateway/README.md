@@ -14,8 +14,8 @@
 ├─────────┼───────────────┼─────────────────┼────────────────────┤
 │         │               │                 │                     │
 │  ┌──────┴───────┐ ┌──────┴────────┐ ┌─────┴──────────┐        │
-│  │ TradeGatewayServer  │ │ QuoteGatewayServer   │ │ TradeGatewayApi       │        │
-│  │ (ROUTER)     │ │ (PUB)         │ │ QuoteGatewayApi       │        │
+│  │ TradeGatewayServer  │ │ QuoteGatewayServer   │ │ TradeApi       │        │
+│  │ (ROUTER)     │ │ (PUB)         │ │ QuoteApi       │        │
 │  │ :12345       │ │ :12346        │ │ (DEALER / SUB) │        │
 │  └──────────────┘ └───────────────┘ └────────────────┘        │
 │       trade/           quote/              SDK 层              │
@@ -44,12 +44,12 @@ gateway/
 │   ├── TradeTypes.h              # 类型+消息枚举+错误码
 │   ├── TradeHandler.h            # 服务端业务处理器接口
 │   ├── TradeGatewayServer.h/.cpp        # 交易服务端
-│   └── TradeGatewayApi.h/.cpp           # 交易客户端 SDK
+│   └── TradeApi.h/.cpp           # 交易客户端 SDK
 ├── quote/                        # 行情网关
 │   ├── quote.proto               # 行情协议定义
 │   ├── QuoteTypes.h              # 类型+消息枚举+错误码
 │   ├── QuoteGatewayServer.h/.cpp        # 行情服务端（PUB 广播）
-│   └── QuoteGatewayApi.h/.cpp           # 行情客户端 SDK（SUB 接收）
+│   └── QuoteApi.h/.cpp           # 行情客户端 SDK（SUB 接收）
 ├── common/                       # 共享
 │   ├── message_utils.h/.cpp      # ZMQ 消息收发
 │   ├── gateway_msg_types.h       # 基础消息类型
@@ -83,7 +83,7 @@ gateway/
 
 **数据流**:
 ```
-Client (TradeGatewayApi)                  Server (TradeGatewayServer)
+Client (TradeApi)                  Server (TradeGatewayServer)
   |                                       |
   |--[DEALER]--LoginRequest-->[ROUTER:12345]
   |                                       |→ TradeHandler::OnLogin
@@ -111,7 +111,7 @@ Client (TradeGatewayApi)                  Server (TradeGatewayServer)
 
 **数据流**:
 ```
-Client (QuoteGatewayApi)              Server (QuoteGatewayServer)
+Client (QuoteApi)              Server (QuoteGatewayServer)
   |                                   |
   |--[SUB]--Subscribe("notice")------>| (本地 ZMQ 过滤，不发网络请求)
   |                                   |
@@ -200,7 +200,7 @@ cmake --build cmake-build-debug
 2. 在 `trade/TradeTypes.h` 的 `TradeMsgType` 枚举中添加新值
 3. 在 `trade/TradeHandler.h` 中添加新虚函数
 4. 在 `trade/TradeGatewayServer.cpp` 的 `switch` 中添加 `case` 分支
-5. 在 `trade/TradeGatewayApi.cpp` 中添加序列化/反序列化 + 发送/接收回调
+5. 在 `trade/TradeApi.cpp` 中添加序列化/反序列化 + 发送/接收回调
 
 ## 框架基类说明
 
