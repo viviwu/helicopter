@@ -10,8 +10,8 @@
 #ifndef TRADE_TRADE_SERVER_H
 #define TRADE_TRADE_SERVER_H
 
-#include "framework/RouterServer.h"
-#include "trade/TradeTypes.h"
+#include "../include/gateway/api/TradeTypes.h"
+#include "RouterServer.h"
 #include "trade/TradeHandler.h"
 
 namespace trade {

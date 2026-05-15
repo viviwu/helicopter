@@ -10,8 +10,8 @@
 #ifndef QUOTE_QUOTE_SERVER_H
 #define QUOTE_QUOTE_SERVER_H
 
-#include "framework/PubServer.h"
-#include "quote/QuoteTypes.h"
+#include "../include/gateway/api/QuoteTypes.h"
+#include "PubServer.h"
 
 #include <string>
 

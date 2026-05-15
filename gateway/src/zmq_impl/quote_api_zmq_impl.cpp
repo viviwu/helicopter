@@ -7,7 +7,7 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#include "quote/quote_api_zmq_impl.h"
+#include "quote_api_zmq_impl.h"
 #include "common/message_utils.h"
 
 #include <iostream>

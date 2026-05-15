@@ -10,8 +10,8 @@
 #ifndef QUOTE_QUOTE_API_H
 #define QUOTE_QUOTE_API_H
 
-#include "quote/QuoteTypes.h"
-#include "quote/quote_api_zmq_impl.h"
+#include "../../../src/zmq_impl/quote_api_zmq_impl.h"
+#include "QuoteTypes.h"
 
 namespace quote {
 

@@ -7,7 +7,7 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#include "trade/TradeApi.h"
+#include "../include/gateway/api/TradeApi.h"
 
 // protobuf 仅在实现文件中可见
 #include "trade.pb.h"

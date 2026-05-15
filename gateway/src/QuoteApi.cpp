@@ -7,7 +7,7 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#include "quote/QuoteApi.h"
+#include "../include/gateway/api/QuoteApi.h"
 
 #include "quote.pb.h"
 

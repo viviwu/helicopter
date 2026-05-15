@@ -12,8 +12,8 @@
 #include <atomic>
 #include <csignal>
 
-#include "trade/TradeApi.h"
-#include "quote/QuoteApi.h"
+#include "../include/gateway/api/QuoteApi.h"
+#include "../include/gateway/api/TradeApi.h"
 
 using namespace trade;
 using namespace quote;

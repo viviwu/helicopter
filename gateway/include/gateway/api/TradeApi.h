@@ -10,8 +10,8 @@
 #ifndef TRADE_TRADE_API_H
 #define TRADE_TRADE_API_H
 
-#include "trade/TradeTypes.h"
-#include "trade/trade_api_zmq_impl.h"
+#include "../../../src/zmq_impl/trade_api_zmq_impl.h"
+#include "TradeTypes.h"
 
 namespace trade {
 

@@ -11,10 +11,10 @@
 #include <csignal>
 #include <string>
 
-#include "trade/TradeGatewayServer.h"
-#include "trade/TradeHandler.h"
-#include "quote/QuoteGatewayServer.h"
+#include "QuoteGatewayServer.h"
+#include "TradeGatewayServer.h"
 #include "common/ThreadPool.h"
+#include "trade/TradeHandler.h"
 
 #include "trade.pb.h"
 
