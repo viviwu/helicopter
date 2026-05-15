@@ -7,13 +7,15 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#ifndef TRADE_TRADE_API_H
-#define TRADE_TRADE_API_H
+#ifndef GATEWAY_TRADE_API_H
+#define GATEWAY_TRADE_API_H
 
-#include "../../../src/zmq_impl/trade_api_zmq_impl.h"
 #include "trade_types.h"
+#include "../../../src/zmq_impl/trade_api_zmq_impl.h"
 
 namespace trade {
+
+// class TradeApiZmqImpl;
 
 /// 交易网关回调接口
 class TradeSpi {
@@ -29,19 +31,19 @@ public:
 };
 
 /// 交易网关客户端 SDK
-class trade_api {
+class TradeApi {
 public:
-    trade_api();
-    ~trade_api();
+    TradeApi();
+    ~TradeApi();
 
-    trade_api(const trade_api&) = delete;
-    trade_api& operator=(const trade_api&) = delete;
+    TradeApi(const TradeApi&) = delete;
+    TradeApi& operator=(const TradeApi&) = delete;
 
     void RegisterSpi(TradeSpi* spi) { spi_ = spi; }
 
     int Connect(const char* address, int routerPort, int heartbeatSec);
     void Disconnect();
-    bool IsConnected() const { return zmq_impl_.IsConnected(); }
+    bool IsConnected() const ;
 
     // 交易 API
     int Login(const LoginRequest& req);
@@ -57,4 +59,4 @@ private:
 
 } // namespace trade
 
-#endif // TRADE_TRADE_API_H
+#endif // GATEWAY_TRADE_API_H

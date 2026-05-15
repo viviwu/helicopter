@@ -7,8 +7,8 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#ifndef QUOTE_QUOTE_API_H
-#define QUOTE_QUOTE_API_H
+#ifndef GATEWAY_QUOTE_API_H
+#define GATEWAY_QUOTE_API_H
 
 #include "../../../src/zmq_impl/quote_api_zmq_impl.h"
 #include "quote_types.h"
@@ -33,13 +33,13 @@ public:
 /// 行情网关客户端 SDK
 /// 通过 SUB socket 连接 QuoteGateway 的 PUB 端口，
 /// 使用本地 Subscribe/Unsubscribe 管理主题过滤。
-class quote_api {
+class QuoteApi {
 public:
-    quote_api();
-    ~quote_api();
+    QuoteApi();
+    ~QuoteApi();
 
-    quote_api(const quote_api&) = delete;
-    quote_api& operator=(const quote_api&) = delete;
+    QuoteApi(const QuoteApi&) = delete;
+    QuoteApi& operator=(const QuoteApi&) = delete;
 
     void RegisterSpi(QuoteSpi* spi) { spi_ = spi; }
 
@@ -58,4 +58,4 @@ private:
 
 } // namespace quote
 
-#endif // QUOTE_QUOTE_API_H
+#endif // GATEWAY_QUOTE_API_H

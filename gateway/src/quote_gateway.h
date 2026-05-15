@@ -7,8 +7,8 @@
   * @date           : 10/05/26
   ******************************************************************************
   */
-#ifndef QUOTE_QUOTE_SERVER_H
-#define QUOTE_QUOTE_SERVER_H
+#ifndef GATEWAY_QUOTE_SERVER_H
+#define GATEWAY_QUOTE_SERVER_H
 
 #include "../include/gateway/api/quote_types.h"
 #include "PubServer.h"
@@ -54,4 +54,4 @@ private:
 
 } // namespace quote
 
-#endif // QUOTE_QUOTE_SERVER_H
+#endif // GATEWAY_QUOTE_SERVER_H

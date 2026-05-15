@@ -118,8 +118,8 @@ static void printMenu(bool tradeConnected, bool quoteConnected) {
 // main
 // ============================================================================
 int main() {
-    trade_api tradeApi;
-    quote_api quoteApi;
+    TradeApi tradeApi;
+    QuoteApi quoteApi;
 
     MyTradeSpi tradeSpi;
     MyQuoteSpi quoteSpi;

@@ -7,8 +7,8 @@
   * @date           : 10/05/26
   ******************************************************************************
   */
-#ifndef TRADE_TRADE_SERVER_H
-#define TRADE_TRADE_SERVER_H
+#ifndef GATEWAY_TRADE_SERVER_H
+#define GATEWAY_TRADE_SERVER_H
 
 #include "RouterServer.h"
 #include "TradeHandler.h"
@@ -33,4 +33,4 @@ private:
 
 } // namespace trade
 
-#endif // TRADE_TRADE_SERVER_H
+#endif // GATEWAY_TRADE_SERVER_H

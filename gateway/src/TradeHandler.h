@@ -7,8 +7,8 @@
   * @date           : 10/05/26
   ******************************************************************************
   */
-#ifndef TRADE_TRADE_HANDLER_H
-#define TRADE_TRADE_HANDLER_H
+#ifndef GATEWAY_TRADE_HANDLER_H
+#define GATEWAY_TRADE_HANDLER_H
 
 namespace trade_proto {
 class LoginRequest;
@@ -44,4 +44,4 @@ public:
 
 } // namespace trade
 
-#endif // TRADE_TRADE_HANDLER_H
+#endif // GATEWAY_TRADE_HANDLER_H

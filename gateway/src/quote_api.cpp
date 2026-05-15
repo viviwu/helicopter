@@ -19,7 +19,7 @@ namespace quote {
 // 构造 / 析构
 // ============================================================================
 
-quote_api::quote_api() {
+QuoteApi::QuoteApi() {
     zmq_impl_.on_connected = [this]() {
         if (spi_) spi_->OnFrontConnected();
     };
@@ -68,17 +68,17 @@ quote_api::quote_api() {
     };
 }
 
-quote_api::~quote_api() = default;
+QuoteApi::~QuoteApi() = default;
 
 // ============================================================================
 // 连接管理
 // ============================================================================
 
-int quote_api::Connect(const char* address, int pubPort) {
+int QuoteApi::Connect(const char* address, int pubPort) {
     return zmq_impl_.Connect(address, pubPort);
 }
 
-void quote_api::Disconnect() {
+void QuoteApi::Disconnect() {
     zmq_impl_.Disconnect();
 }
 

@@ -7,8 +7,8 @@
   * @date           : 10/05/26
   ******************************************************************************
   */
-#ifndef TRADE_TRADE_TYPES_H
-#define TRADE_TRADE_TYPES_H
+#ifndef GATEWAY_TRADE_TYPES_H
+#define GATEWAY_TRADE_TYPES_H
 
 #include <cstdint>
 #include <string>
@@ -120,4 +120,4 @@ struct CancelOrderResponse {
 
 } // namespace trade
 
-#endif // TRADE_TRADE_TYPES_H
+#endif // GATEWAY_TRADE_TYPES_H

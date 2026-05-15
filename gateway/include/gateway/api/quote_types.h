@@ -7,8 +7,8 @@
   * @date           : 10/05/26
   ******************************************************************************
   */
-#ifndef QUOTE_QUOTE_TYPES_H
-#define QUOTE_QUOTE_TYPES_H
+#ifndef GATEWAY_QUOTE_TYPES_H
+#define GATEWAY_QUOTE_TYPES_H
 
 #include <cstdint>
 #include <string>
@@ -44,4 +44,4 @@ struct Notice {
 
 } // namespace quote
 
-#endif // QUOTE_QUOTE_TYPES_H
+#endif // GATEWAY_QUOTE_TYPES_H
