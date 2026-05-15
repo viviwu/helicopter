@@ -12,8 +12,8 @@
 #include <atomic>
 #include <csignal>
 
-#include "../include/gateway/api/QuoteApi.h"
-#include "../include/gateway/api/TradeApi.h"
+#include "../include/gateway/api/quote_api.h"
+#include "../include/gateway/api/trade_api.h"
 
 using namespace trade;
 using namespace quote;
@@ -118,8 +118,8 @@ static void printMenu(bool tradeConnected, bool quoteConnected) {
 // main
 // ============================================================================
 int main() {
-    TradeApi tradeApi;
-    QuoteApi quoteApi;
+    trade_api tradeApi;
+    quote_api quoteApi;
 
     MyTradeSpi tradeSpi;
     MyQuoteSpi quoteSpi;

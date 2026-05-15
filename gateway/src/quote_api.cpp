@@ -7,7 +7,7 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#include "../include/gateway/api/QuoteApi.h"
+#include "../include/gateway/api/quote_api.h"
 
 #include "quote.pb.h"
 
@@ -19,7 +19,7 @@ namespace quote {
 // 构造 / 析构
 // ============================================================================
 
-QuoteApi::QuoteApi() {
+quote_api::quote_api() {
     zmq_impl_.on_connected = [this]() {
         if (spi_) spi_->OnFrontConnected();
     };
@@ -68,17 +68,17 @@ QuoteApi::QuoteApi() {
     };
 }
 
-QuoteApi::~QuoteApi() = default;
+quote_api::~quote_api() = default;
 
 // ============================================================================
 // 连接管理
 // ============================================================================
 
-int QuoteApi::Connect(const char* address, int pubPort) {
+int quote_api::Connect(const char* address, int pubPort) {
     return zmq_impl_.Connect(address, pubPort);
 }
 
-void QuoteApi::Disconnect() {
+void quote_api::Disconnect() {
     zmq_impl_.Disconnect();
 }
 

@@ -11,7 +11,7 @@
 #define QUOTE_QUOTE_API_H
 
 #include "../../../src/zmq_impl/quote_api_zmq_impl.h"
-#include "QuoteTypes.h"
+#include "quote_types.h"
 
 namespace quote {
 
@@ -31,15 +31,15 @@ public:
 };
 
 /// 行情网关客户端 SDK
-/// 通过 SUB socket 连接 QuoteGatewayServer 的 PUB 端口，
+/// 通过 SUB socket 连接 QuoteGateway 的 PUB 端口，
 /// 使用本地 Subscribe/Unsubscribe 管理主题过滤。
-class QuoteApi {
+class quote_api {
 public:
-    QuoteApi();
-    ~QuoteApi();
+    quote_api();
+    ~quote_api();
 
-    QuoteApi(const QuoteApi&) = delete;
-    QuoteApi& operator=(const QuoteApi&) = delete;
+    quote_api(const quote_api&) = delete;
+    quote_api& operator=(const quote_api&) = delete;
 
     void RegisterSpi(QuoteSpi* spi) { spi_ = spi; }
 

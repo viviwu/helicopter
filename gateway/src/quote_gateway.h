@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file           : QuoteGatewayServer.h
+  * @file           : QuoteGateway.h
   * @author         : vivi wu
   * @brief          : 行情网关服务端（PUB 模式 / 主题数据发布）
   * @version        : 0.2.0
@@ -10,7 +10,7 @@
 #ifndef QUOTE_QUOTE_SERVER_H
 #define QUOTE_QUOTE_SERVER_H
 
-#include "../include/gateway/api/QuoteTypes.h"
+#include "../include/gateway/api/quote_types.h"
 #include "PubServer.h"
 
 #include <string>
@@ -26,10 +26,10 @@ struct QuoteTopic {
 /// 行情网关服务端
 /// 基于 PubServer，发布行情数据和通知到指定 topic。
 /// 客户端通过 QuoteApi 的 SUB socket 本地订阅/取消订阅。
-class QuoteGatewayServer {
+class QuoteGateway {
 public:
-    QuoteGatewayServer() = default;
-    ~QuoteGatewayServer();
+    QuoteGateway() = default;
+    ~QuoteGateway();
 
     // ==========================================================================
     // 生命周期

@@ -7,7 +7,7 @@
  * @date           : 13/05/26
  ******************************************************************************
  */
-#include "../include/gateway/api/TradeApi.h"
+#include "../include/gateway/api/trade_api.h"
 
 // protobuf 仅在实现文件中可见
 #include "trade.pb.h"
@@ -101,7 +101,7 @@ static CancelOrderResponse FromProto(const trade_proto::CancelOrderResponse& p) 
 // 构造 / 析构
 // ============================================================================
 
-TradeApi::TradeApi() {
+trade_api::trade_api() {
     zmq_impl_.on_connected = [this]() {
         if (spi_) spi_->OnFrontConnected();
     };
@@ -148,17 +148,17 @@ TradeApi::TradeApi() {
     };
 }
 
-TradeApi::~TradeApi() = default;
+trade_api::~trade_api() = default;
 
 // ============================================================================
 // 连接管理
 // ============================================================================
 
-int TradeApi::Connect(const char* address, int routerPort, int heartbeatSec) {
+int trade_api::Connect(const char* address, int routerPort, int heartbeatSec) {
     return zmq_impl_.Connect(address, routerPort, heartbeatSec);
 }
 
-void TradeApi::Disconnect() {
+void trade_api::Disconnect() {
     zmq_impl_.Disconnect();
 }
 
@@ -166,7 +166,7 @@ void TradeApi::Disconnect() {
 // API 方法
 // ============================================================================
 
-int TradeApi::Login(const LoginRequest& req) {
+int trade_api::Login(const LoginRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -176,7 +176,7 @@ int TradeApi::Login(const LoginRequest& req) {
     return ERR_OK;
 }
 
-int TradeApi::PlaceOrder(const PlaceOrderRequest& req) {
+int trade_api::PlaceOrder(const PlaceOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -186,7 +186,7 @@ int TradeApi::PlaceOrder(const PlaceOrderRequest& req) {
     return ERR_OK;
 }
 
-int TradeApi::QueryOrder(const QueryOrderRequest& req) {
+int trade_api::QueryOrder(const QueryOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());
@@ -196,7 +196,7 @@ int TradeApi::QueryOrder(const QueryOrderRequest& req) {
     return ERR_OK;
 }
 
-int TradeApi::CancelOrder(const CancelOrderRequest& req) {
+int trade_api::CancelOrder(const CancelOrderRequest& req) {
     auto proto = ToProto(req);
     std::string data = proto.SerializeAsString();
     std::vector<uint8_t> body(data.begin(), data.end());

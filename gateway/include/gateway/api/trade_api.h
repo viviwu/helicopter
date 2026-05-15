@@ -11,7 +11,7 @@
 #define TRADE_TRADE_API_H
 
 #include "../../../src/zmq_impl/trade_api_zmq_impl.h"
-#include "TradeTypes.h"
+#include "trade_types.h"
 
 namespace trade {
 
@@ -29,13 +29,13 @@ public:
 };
 
 /// 交易网关客户端 SDK
-class TradeApi {
+class trade_api {
 public:
-    TradeApi();
-    ~TradeApi();
+    trade_api();
+    ~trade_api();
 
-    TradeApi(const TradeApi&) = delete;
-    TradeApi& operator=(const TradeApi&) = delete;
+    trade_api(const trade_api&) = delete;
+    trade_api& operator=(const trade_api&) = delete;
 
     void RegisterSpi(TradeSpi* spi) { spi_ = spi; }
 

@@ -7,7 +7,7 @@
   * @date           : 10/05/26
   ******************************************************************************
   */
-#include "framework/RouterServer.h"
+#include "RouterServer.h"
 #include "common/message_utils.h"
 #include "common/ThreadPool.h"
 

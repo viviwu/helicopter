@@ -1,20 +1,20 @@
 /**
   ******************************************************************************
-  * @file           : TradeGatewayServer.cpp
+  * @file           : TradeGateway.cpp
   * @author         : vivi wu
   * @brief          : 交易网关服务端实现
   * @version        : 0.1.0
   * @date           : 10/05/26
   ******************************************************************************
   */
-#include "trade/TradeGatewayServer.h"
 #include "trade.pb.h"
+#include "trade_gateway.h"
 
 #include <iostream>
 
 namespace trade {
 
-void TradeGatewayServer::OnMessage(const std::vector<uint8_t>& identity,
+void TradeGateway::OnMessage(const std::vector<uint8_t>& identity,
                              uint16_t msgType,
                              const std::vector<uint8_t>& body) {
     if (!IsRunning()) return;
@@ -30,7 +30,7 @@ void TradeGatewayServer::OnMessage(const std::vector<uint8_t>& identity,
     case TradeMsgType::kLoginRequest: {
         trade_proto::LoginRequest req;
         if (!req.ParseFromArray(body.data(), static_cast<int>(body.size()))) {
-            std::cerr << "[TradeGatewayServer] Failed to parse LoginRequest\n";
+            std::cerr << "[TradeGateway] Failed to parse LoginRequest\n";
             return;
         }
 
@@ -75,7 +75,7 @@ void TradeGatewayServer::OnMessage(const std::vector<uint8_t>& identity,
         break;
     }
     default:
-        std::cerr << "[TradeGatewayServer] Unknown message type: " << msgType << "\n";
+        std::cerr << "[TradeGateway] Unknown message type: " << msgType << "\n";
         break;
     }
 }

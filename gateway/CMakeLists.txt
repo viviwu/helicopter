@@ -35,14 +35,15 @@ endif()
 set(PROTO_GEN_DIR ${CMAKE_SOURCE_DIR}/proto/generated)
 file(MAKE_DIRECTORY ${PROTO_GEN_DIR})
 
+set(PROTO_FILE_DIR ${CMAKE_SOURCE_DIR}/include/gateway/proto)
 # Trade proto
-set(TRADE_PROTO_FILE ${CMAKE_SOURCE_DIR}/trade/trade.proto)
-set(TRADE_PROTO_GEN_DIR ${CMAKE_SOURCE_DIR}/trade/generated)
+set(TRADE_PROTO_FILE ${PROTO_FILE_DIR}/trade.proto)
+set(TRADE_PROTO_GEN_DIR ${PROTO_FILE_DIR}/generated)
 file(MAKE_DIRECTORY ${TRADE_PROTO_GEN_DIR})
 add_custom_command(
   OUTPUT ${TRADE_PROTO_GEN_DIR}/trade.pb.cc ${TRADE_PROTO_GEN_DIR}/trade.pb.h
   COMMAND ${PROTOC_EXE}
-    --proto_path=${CMAKE_SOURCE_DIR}/trade
+    --proto_path=${PROTO_FILE_DIR}
     --cpp_out=${TRADE_PROTO_GEN_DIR}
     ${TRADE_PROTO_FILE}
   DEPENDS ${TRADE_PROTO_FILE}
@@ -50,13 +51,13 @@ add_custom_command(
 )
 
 # Quote proto
-set(QUOTE_PROTO_FILE ${CMAKE_SOURCE_DIR}/include/gateway/quote/quote.proto)
-set(QUOTE_PROTO_GEN_DIR ${CMAKE_SOURCE_DIR}/include/gateway/quote/generated)
+set(QUOTE_PROTO_FILE ${PROTO_FILE_DIR}/quote.proto)
+set(QUOTE_PROTO_GEN_DIR ${PROTO_FILE_DIR}/generated)
 file(MAKE_DIRECTORY ${QUOTE_PROTO_GEN_DIR})
 add_custom_command(
   OUTPUT ${QUOTE_PROTO_GEN_DIR}/quote.pb.cc ${QUOTE_PROTO_GEN_DIR}/quote.pb.h
   COMMAND ${PROTOC_EXE}
-    --proto_path=${CMAKE_SOURCE_DIR}/quote
+    --proto_path=${PROTO_FILE_DIR}
     --cpp_out=${QUOTE_PROTO_GEN_DIR}
     ${QUOTE_PROTO_FILE}
   DEPENDS ${QUOTE_PROTO_FILE}
@@ -81,6 +82,8 @@ target_link_libraries(message_utils PRIVATE PkgConfig::ZEROMQ)
 add_library(thread_pool STATIC common/ThreadPool.cpp)
 target_include_directories(thread_pool PUBLIC ${CMAKE_SOURCE_DIR}/common)
 
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
 # ---- 5. Framework ----
 add_library(gateway_framework STATIC
   src/RouterServer.cpp
@@ -90,24 +93,24 @@ target_include_directories(gateway_framework PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(gateway_framework PUBLIC message_utils thread_pool)
 
 # ---- 6. Trade Gateway ----
-# TradeGatewayServer (server-side)
-add_library(trade_server STATIC src/TradeGatewayServer.cpp)
+# trade_gateway (server-side)
+add_library(trade_server STATIC src/trade_gateway.cpp)
 target_include_directories(trade_server PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(trade_server PUBLIC gateway_framework trade_proto_gen)
 
-# TradeApi (client-side SDK)
-add_library(trade_api STATIC src/TradeApi.cpp src/zmq_impl/trade_api_zmq_impl.cpp)
+# trade_api (client-side SDK)
+add_library(trade_api STATIC src/trade_api.cpp src/zmq_impl/trade_api_zmq_impl.cpp)
 target_include_directories(trade_api PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(trade_api PUBLIC gateway_framework trade_proto_gen)
 
 # ---- 7. Quote Gateway ----
-# QuoteGatewayServer (server-side)
-add_library(quote_server STATIC src/QuoteGatewayServer.cpp)
+# quote_gateway (server-side)
+add_library(quote_server STATIC src/quote_gateway.cpp)
 target_include_directories(quote_server PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(quote_server PUBLIC gateway_framework quote_proto_gen)
 
-# QuoteApi (client-side SDK)
-add_library(quote_api STATIC src/QuoteApi.cpp src/zmq_impl/quote_api_zmq_impl.cpp)
+# quote_api (client-side SDK)
+add_library(quote_api STATIC src/quote_api.cpp src/zmq_impl/quote_api_zmq_impl.cpp)
 target_include_directories(quote_api PUBLIC ${CMAKE_SOURCE_DIR})
 target_link_libraries(quote_api PUBLIC gateway_framework quote_proto_gen)
 

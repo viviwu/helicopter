@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file           : TradeGatewayServer.h
+  * @file           : TradeGateway.h
   * @author         : vivi wu
   * @brief          : 交易网关服务端（ROUTER 模式 / 请求-应答）
   * @version        : 0.1.0
@@ -10,15 +10,15 @@
 #ifndef TRADE_TRADE_SERVER_H
 #define TRADE_TRADE_SERVER_H
 
-#include "../include/gateway/api/TradeTypes.h"
 #include "RouterServer.h"
-#include "trade/TradeHandler.h"
+#include "TradeHandler.h"
+#include "gateway/api/trade_types.h"
 
 namespace trade {
 
 /// 交易网关服务端
 /// 继承 RouterServer，将消息分派到 TradeHandler
-class TradeGatewayServer : public framework::RouterServer {
+class TradeGateway : public framework::RouterServer {
 public:
     void RegisterHandler(TradeHandler* handler) { handler_ = handler; }
 

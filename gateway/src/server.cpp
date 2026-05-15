@@ -11,10 +11,10 @@
 #include <csignal>
 #include <string>
 
-#include "QuoteGatewayServer.h"
-#include "TradeGatewayServer.h"
+#include "quote_gateway.h"
+#include "trade_gateway.h"
 #include "common/ThreadPool.h"
-#include "trade/TradeHandler.h"
+#include "TradeHandler.h"
 
 #include "trade.pb.h"
 
@@ -85,8 +85,8 @@ private:
 // 全局
 // ============================================================================
 namespace {
-    TradeGatewayServer* g_tradeGw = nullptr;
-    QuoteGatewayServer* g_quoteGw = nullptr;
+    TradeGateway* g_tradeGw = nullptr;
+    QuoteGateway* g_quoteGw = nullptr;
     ThreadPool*  g_pool    = nullptr;
     volatile std::sig_atomic_t g_shutdownRequested = 0;
 }
@@ -118,7 +118,7 @@ int main() {
     ThreadPool pool(4);
 
     // ---- TradeGateway (ROUTER on :12345) ----
-    TradeGatewayServer tradeGw;
+    TradeGateway tradeGw;
     MyTradeHandler tradeHandler;
     tradeGw.RegisterHandler(&tradeHandler);
     tradeGw.SetThreadPool(&pool);
@@ -131,7 +131,7 @@ int main() {
     }
 
     // ---- QuoteGateway (PUB on :12346) ----
-    QuoteGatewayServer quoteGw;
+    QuoteGateway quoteGw;
     if (!quoteGw.Start("0.0.0.0", 12346)) {
         std::cerr << "Failed to start QuoteGateway\n";
         tradeGw.Stop();

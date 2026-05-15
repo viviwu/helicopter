@@ -1,13 +1,13 @@
 /**
   ******************************************************************************
-  * @file           : QuoteGatewayServer.cpp
+  * @file           : QuoteGateway.cpp
   * @author         : vivi wu
   * @brief          : 行情网关服务端实现（纯 PUB 模式）
   * @version        : 0.2.0
   * @date           : 10/05/26
   ******************************************************************************
   */
-#include "quote/QuoteGatewayServer.h"
+#include "quote_gateway.h"
 #include "quote.pb.h"
 
 #include <chrono>
@@ -15,19 +15,19 @@
 
 namespace quote {
 
-QuoteGatewayServer::~QuoteGatewayServer() {
+QuoteGateway::~QuoteGateway() {
     Stop();
 }
 
-bool QuoteGatewayServer::Start(const char* bindAddr, int port) {
+bool QuoteGateway::Start(const char* bindAddr, int port) {
     return pubServer_.Start(bindAddr, port);
 }
 
-void QuoteGatewayServer::Stop() {
+void QuoteGateway::Stop() {
     pubServer_.Stop();
 }
 
-bool QuoteGatewayServer::PublishMarketData(const std::string& symbol, double price,
+bool QuoteGateway::PublishMarketData(const std::string& symbol, double price,
                                      double volume) {
     quote_proto::MarketData md;
     md.set_symbol(symbol);
@@ -46,13 +46,13 @@ bool QuoteGatewayServer::PublishMarketData(const std::string& symbol, double pri
         static_cast<uint16_t>(QuoteMsgType::kMarketData), body);
 
     if (ok) {
-        std::cout << "[QuoteGatewayServer] MarketData → " << topic
+        std::cout << "[QuoteGateway] MarketData → " << topic
                   << ": " << symbol << " = " << price << "\n";
     }
     return ok;
 }
 
-bool QuoteGatewayServer::PublishNotice(const std::string& content) {
+bool QuoteGateway::PublishNotice(const std::string& content) {
     uint64_t msgId = pubServer_.NextMessageId();
 
     quote_proto::Notice notice;
@@ -70,7 +70,7 @@ bool QuoteGatewayServer::PublishNotice(const std::string& content) {
         static_cast<uint16_t>(QuoteMsgType::kNotice), body);
 
     if (ok) {
-        std::cout << "[QuoteGatewayServer] Notice published (msg_id=" << msgId
+        std::cout << "[QuoteGateway] Notice published (msg_id=" << msgId
                   << "): " << content << "\n";
     }
     return ok;

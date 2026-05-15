@@ -24,7 +24,7 @@ class CancelOrderResponse;
 namespace trade {
 
 /// 交易网关业务处理器接口
-/// 每个方法对应一种交易消息类型，由 TradeGatewayServer 在收到消息后调用
+/// 每个方法对应一种交易消息类型，由 TradeGateway 在收到消息后调用
 class TradeHandler {
 public:
     virtual ~TradeHandler() = default;
